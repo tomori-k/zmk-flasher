@@ -22,4 +22,5 @@ export interface Firmware {
   boardId?: string
   familyId?: string
   size: number
+  commitMessage?: string
 }

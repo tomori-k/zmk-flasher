@@ -149,6 +149,10 @@ const fetchLatestFirmware = async (
     throw new Error('Artifactsが見つかりません')
   }
 
+  // コミットメッセージを取得
+  const commitMessage =
+    workflowRuns[0].head_commit?.message || 'コミットメッセージなし'
+
   // artifactsをFirmwareオブジェクトに変換
   return artifacts.map((artifact: any) => ({
     id: `github-artifact-${artifact.id}`,
@@ -156,6 +160,7 @@ const fetchLatestFirmware = async (
     path: artifact.archive_download_url,
     buildDate: artifact.created_at,
     branch: workflowRuns[0].head_branch || 'unknown',
+    commitMessage,
     size: artifact.size_in_bytes,
     // Note: boardIdとfamilyIdはartifact名から推測するか、
     // メタデータが利用可能であれば追加する必要があります
@@ -270,6 +275,11 @@ export default function FirmwarePanel({
                             {firmware.name} (
                             {new Date(firmware.buildDate).toLocaleDateString()}{' '}
                             - {firmware.branch})
+                            {firmware.commitMessage && (
+                              <div className="text-xs text-muted-foreground mt-1 truncate max-w-[400px]">
+                                {firmware.commitMessage}
+                              </div>
+                            )}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -307,6 +317,16 @@ export default function FirmwarePanel({
                               ).toLocaleString()}
                             </p>
                           </div>
+                          {selectedFirmware.commitMessage && (
+                            <div className="col-span-2">
+                              <p className="text-sm text-muted-foreground">
+                                コミットメッセージ
+                              </p>
+                              <p className="break-words">
+                                {selectedFirmware.commitMessage}
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         {isCompatible !== null && (
