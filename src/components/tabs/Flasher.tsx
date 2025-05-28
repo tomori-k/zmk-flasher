@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from '@/components/ui/resizable'
 import { Device, Repository, Firmware } from '@/types/types'
+import { useRepositoriesStore } from '@/stores/repositories'
 import DevicePanel from './flasher/DevicePanel'
 import FirmwarePanel from './flasher/FirmwarePanel'
 import { RepositoryPanel } from './flasher/RepositoryPanel'
@@ -14,13 +16,19 @@ import RepositoryDialog from './flasher/RepositoryDialog'
 import { FlashProgress } from './flasher/types'
 
 export default function Flasher() {
+  // リポジトリストアからデータとアクションを取得
+  const {
+    repositories,
+    selectedRepository,
+    setSelectedRepository,
+    addRepository: addRepoToStore,
+    removeRepository: removeRepoFromStore,
+  } = useRepositoriesStore()
+
   // State
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [isLoadingDevices, setIsLoadingDevices] = useState(false)
-
-  const [repositories, setRepositories] = useState<Repository[]>([])
-  const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null)
 
   const [firmwares, setFirmwares] = useState<Firmware[]>([])
   const [selectedFirmware, setSelectedFirmware] = useState<Firmware | null>(
@@ -72,7 +80,7 @@ export default function Flasher() {
   }
 
   const loadFirmwares = async () => {
-    if (!selectedDevice || !selectedRepo) return
+    if (!selectedDevice || !selectedRepository) return
 
     setIsLoadingFirmwares(true)
     setSelectedFirmware(null)
@@ -109,23 +117,39 @@ export default function Flasher() {
     }
   }
 
+  // リポジトリの追加
   const addRepository = async () => {
     // Validate input
-    if (!newRepoUrl) return
-
-    // Extract owner and repo from URL
-    const urlParts = newRepoUrl
-      .replace(/https:\/\/github\.com\//, '')
-      .split('/')
-    const owner = urlParts[0]
-    const repo = urlParts[1]
-
-    if (!owner || !repo) {
-      alert('Invalid GitHub URL format')
+    if (!newRepoUrl) {
+      toast.error('リポジトリURLを入力してください')
       return
     }
 
-    // Mock add repository - replace with actual implementation
+    // GitHub URLのバリデーション
+    const githubRegex = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)/
+    const match = newRepoUrl.match(githubRegex)
+
+    if (!match) {
+      toast.error(
+        '有効なGitHub URLを入力してください (例: https://github.com/owner/repo)'
+      )
+      return
+    }
+
+    const owner = match[1]
+    const repo = match[2]
+
+    // 既存のリポジトリと重複しないか確認
+    const isDuplicate = repositories.some(
+      (r) => r.owner === owner && r.repo === repo
+    )
+
+    if (isDuplicate) {
+      toast.error('このリポジトリは既に追加されています')
+      return
+    }
+
+    // 新しいリポジトリを作成
     const newRepo: Repository = {
       id: Date.now().toString(),
       url: newRepoUrl,
@@ -133,14 +157,40 @@ export default function Flasher() {
       repo,
     }
 
-    setRepositories((prev) => [...prev, newRepo])
-    setSelectedRepo(newRepo)
+    // リポジトリリストに追加
+    addRepoToStore(newRepo)
+    setSelectedRepository(newRepo)
     setRepoDialogOpen(false)
 
-    // Reset form
+    // 成功メッセージを表示
+    toast.success(`リポジトリ ${owner}/${repo} を追加しました`)
+
+    // フォームをリセット
     setNewRepoUrl('')
     setNewRepoPAT('')
     setSavePAT(false)
+  }
+
+  // リポジトリの削除
+  const removeRepository = (id: string) => {
+    // 削除するリポジトリを確認
+    const repoToRemove = repositories.find((r) => r.id === id)
+    if (!repoToRemove) return
+
+    // リポジトリリストから削除
+    removeRepoFromStore(repoToRemove.id)
+
+    // 成功メッセージを表示
+    toast.success(
+      `リポジトリ ${repoToRemove.owner}/${repoToRemove.repo} を削除しました`
+    )
+
+    // 選択中のリポジトリが削除される場合は選択解除
+    if (selectedRepository?.id === id) {
+      setSelectedRepository(null)
+      setFirmwares([])
+      setSelectedFirmware(null)
+    }
   }
 
   const checkCompatibility = () => {
@@ -199,6 +249,15 @@ export default function Flasher() {
         status: 'success',
         message: 'Firmware successfully flashed!',
       })
+
+      // 成功トーストを表示
+      toast.success(
+        `${selectedFirmware.name} を ${selectedDevice.name} に書き込みました`,
+        {
+          description: '書き込みが正常に完了しました',
+          duration: 5000,
+        }
+      )
     } catch (error) {
       console.error('Flash failed:', error)
       setFlashProgress({
@@ -207,6 +266,13 @@ export default function Flasher() {
         message: `Flash failed: ${
           error instanceof Error ? error.message : 'Unknown error'
         }`,
+      })
+
+      // エラートーストを表示
+      toast.error('ファームウェアの書き込みに失敗しました', {
+        description:
+          error instanceof Error ? error.message : '不明なエラーが発生しました',
+        duration: 8000,
       })
     }
   }
@@ -219,30 +285,23 @@ export default function Flasher() {
     flashFirmware()
   }
 
-  // Effects
+  // 初期化処理
   useEffect(() => {
+    // デバイス一覧の取得
     refreshDevices()
-
-    // Mock repositories - replace with actual data loading
-    setRepositories([
-      {
-        id: '1',
-        url: 'https://github.com/zmkfirmware/zmk',
-        owner: 'zmkfirmware',
-        repo: 'zmk',
-      },
-    ])
   }, [])
 
+  // リポジトリまたはデバイスが変更されたらファームウェア一覧を更新
   useEffect(() => {
-    if (selectedDevice && selectedRepo) {
+    if (selectedDevice && selectedRepository) {
       loadFirmwares()
     } else {
       setFirmwares([])
       setSelectedFirmware(null)
     }
-  }, [selectedDevice, selectedRepo])
+  }, [selectedDevice, selectedRepository])
 
+  // 互換性チェック
   useEffect(() => {
     checkCompatibility()
   }, [selectedDevice, selectedFirmware])
@@ -271,9 +330,10 @@ export default function Flasher() {
               <ResizablePanel defaultSize={40} minSize={25}>
                 <RepositoryPanel
                   repositories={repositories}
-                  selectedRepo={selectedRepo}
-                  setSelectedRepo={setSelectedRepo}
+                  selectedRepo={selectedRepository}
+                  setSelectedRepo={setSelectedRepository}
                   setRepoDialogOpen={setRepoDialogOpen}
+                  removeRepository={removeRepository}
                 />
               </ResizablePanel>
 
@@ -283,7 +343,7 @@ export default function Flasher() {
               <ResizablePanel defaultSize={60}>
                 <FirmwarePanel
                   selectedDevice={selectedDevice}
-                  selectedRepo={selectedRepo}
+                  selectedRepo={selectedRepository}
                   firmwares={firmwares}
                   selectedFirmware={selectedFirmware}
                   setSelectedFirmware={setSelectedFirmware}

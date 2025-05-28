@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Toaster } from '@/components/ui/sonner'
+import { useRepositoriesStore } from '@/stores/repositories'
 import Flasher from '@/components/tabs/Flasher'
 import KeymapEditor from '@/components/tabs/KeymapEditor'
 
@@ -9,9 +11,18 @@ function App() {
   const [name, setName] = useState('')
 
   async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
     setGreetMsg(await invoke('greet', { name }))
   }
+
+  // リポジトリストアの初期化
+  const initializeRepositories = useRepositoriesStore(
+    (state) => state.initialize
+  )
+
+  useEffect(() => {
+    // アプリ起動時にリポジトリストアを初期化
+    initializeRepositories()
+  }, [])
 
   return (
     <main>
@@ -27,6 +38,7 @@ function App() {
           <KeymapEditor />
         </TabsContent>
       </Tabs>
+      <Toaster />
     </main>
   )
 }
