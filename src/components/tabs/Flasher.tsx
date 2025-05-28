@@ -349,6 +349,28 @@ export default function Flasher() {
                   setSelectedFirmware={setSelectedFirmware}
                   isLoadingFirmwares={isLoadingFirmwares}
                   isCompatible={isCompatible}
+                  onRefreshFirmwares={(newFirmwares) => {
+                    setFirmwares((prevFirmwares) => {
+                      // 既存のファームウェアリストに新しいファームウェアを追加
+                      // 重複を避けるため、IDでフィルタリング
+                      const existingIds = new Set(
+                        prevFirmwares.map((f) => f.id)
+                      )
+                      const uniqueNewFirmwares = newFirmwares.filter(
+                        (f) => !existingIds.has(f.id)
+                      )
+                      return [...prevFirmwares, ...uniqueNewFirmwares]
+                    })
+
+                    // 新しいファームウェアが追加されたことを通知
+                    if (newFirmwares.length > 0) {
+                      toast.success(
+                        `${newFirmwares.length}個の新しいファームウェアを取得しました`
+                      )
+                    } else {
+                      toast.info('新しいファームウェアはありませんでした')
+                    }
+                  }}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
