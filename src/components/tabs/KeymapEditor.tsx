@@ -1,17 +1,28 @@
+import { Button } from '../ui/button'
+import { ExternalLink } from 'lucide-react'
+// Tauriのshellモジュールをインポート
+
+// キーマップエディタのデフォルトURL
+const DEFAULT_KEYMAP_EDITOR_URL = 'https://nickcoutsos.github.io/keymap-editor/'
+
 /**
- * Web 版 KeymapEditor をアプリ内で開く
+ * メインのKeymap Editorコンポーネント
  */
 export default function KeymapEditor() {
+  // Tauriを使って外部ブラウザで開く処理
+  const handleOpenExternal = async () => {
+    // フォールバック: Tauriが動作していない環境（開発環境など）ではwindow.openを使用
+    window.open(DEFAULT_KEYMAP_EDITOR_URL, '_blank')
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center h-full">
-      <h1 className="text-2xl font-bold mb-4">Keymap Editor</h1>
-      <p className="text-gray-600 mb-6">
-        This is the Keymap Editor tab where you can edit your keymaps.
-      </p>
-      {/* Add your keymap editor components here */}
-      <p className="text-gray-500">
-        Keymap editing functionality will be implemented here.
-      </p>
+    <div className="flex justify-center">
+      <a href={DEFAULT_KEYMAP_EDITOR_URL} target="_blank">
+        <Button size="lg" onClick={handleOpenExternal} className="">
+          <ExternalLink className="h-4 w-4" />
+          ブラウザでKeymap Editorを開く
+        </Button>
+      </a>
     </div>
   )
 }
