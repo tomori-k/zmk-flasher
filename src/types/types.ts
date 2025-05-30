@@ -4,6 +4,9 @@ export interface Device {
   side?: 'left' | 'right'
   pid: string
   vid: string
+  manufacturer?: string
+  product?: string
+  serial?: string
 }
 
 export interface Repository {

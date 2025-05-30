@@ -14,6 +14,7 @@ import { BottomBar } from './flasher/BottomBar'
 import ProgressDialog from './flasher/ProgressBarDialog'
 import RepositoryDialog from './flasher/RepositoryDialog'
 import { FlashProgress } from './flasher/types'
+import { invoke } from '@tauri-apps/api/core'
 
 export default function Flasher() {
   // リポジトリストアからデータとアクションを取得
@@ -53,27 +54,25 @@ export default function Flasher() {
   const refreshDevices = async () => {
     setIsLoadingDevices(true)
     try {
-      // Mock data - replace with actual device detection logic
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setDevices([
-        {
-          id: '1',
-          name: 'Corne Keyboard',
-          side: 'left',
-          pid: '0x1234',
-          vid: '0xFEED',
-        },
-        {
-          id: '2',
-          name: 'Corne Keyboard',
-          side: 'right',
-          pid: '0x1235',
-          vid: '0xFEED',
-        },
-        { id: '3', name: 'Kyria Keyboard', pid: '0x4567', vid: '0xFEED' },
-      ])
+      // Tauriのバックエンドから接続されているZMKデバイスのリストを取得
+      const zmkDevices = await invoke<Device[]>('detect_zmk_devices')
+      setDevices(zmkDevices)
+
+      // デバイスが見つからない場合は通知
+      if (zmkDevices.length === 0) {
+        toast.info('ZMKキーボードが見つかりませんでした', {
+          description: 'キーボードがブートローダーモードで接続されていることを確認してください',
+        })
+      } else {
+        toast.success(`${zmkDevices.length}台のZMKキーボードを検出しました`)
+      }
     } catch (error) {
-      console.error('Failed to refresh devices:', error)
+      toast.error('デバイス検出エラー', {
+        description:
+          error instanceof Error ? error.message : '不明なエラーが発生しました',
+      })
+      // エラー時は空のリストにする
+      setDevices([])
     } finally {
       setIsLoadingDevices(false)
     }
