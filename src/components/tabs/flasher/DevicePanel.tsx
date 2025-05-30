@@ -2,7 +2,8 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Device } from '@/types/types'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Keyboard, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Keyboard, Loader2, RefreshCw, AlertTriangle, CheckCircle2, Usb } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 
 // DevicePanel Component
 export interface DevicePanelProps {
@@ -57,13 +58,28 @@ export default function DevicePanel({
                 }`}
                 onClick={() => setSelectedDevice(device)}
               >
-                <div className="font-medium">{device.name}</div>
+                <div className="flex items-center justify-between">
+                  <div className="font-medium flex items-center gap-2">
+                    {device.name}
+                    {selectedDevice?.id === device.id && (
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                    )}
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    ZMK
+                  </Badge>
+                </div>
+                
                 {device.side && (
-                  <div className="text-sm text-muted-foreground">
-                    {device.side === 'left' ? '左側' : '右側'}
+                  <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                    <Badge variant="secondary" className="text-xs">
+                      {device.side === 'left' ? '左側' : '右側'}
+                    </Badge>
                   </div>
                 )}
-                <div className="text-xs text-muted-foreground mt-1">
+                
+                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <Usb className="h-3 w-3" />
                   {device.vid}:{device.pid}
                 </div>
               </div>
@@ -74,7 +90,17 @@ export default function DevicePanel({
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>デバイスが見つかりません</AlertTitle>
             <AlertDescription>
-              キーボードがブートローダーモードで接続されていることを確認してください。
+              ZMKキーボードがブートローダーモードで接続されていることを確認してください。
+              <div className="mt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={refreshDevices}
+                  className="w-full"
+                >
+                  デバイスを再検索
+                </Button>
+              </div>
             </AlertDescription>
           </Alert>
         )}

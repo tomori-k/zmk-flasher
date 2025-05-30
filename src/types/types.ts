@@ -1,11 +1,12 @@
 export interface Device {
   id: string
   name: string
-  manufacturer: string
-  boardId?: string
-  familyId?: string
-  selectedPort?: string
-  ports?: string[]
+  side?: 'left' | 'right'
+  pid: string
+  vid: string
+  manufacturer?: string
+  product?: string
+  serial?: string
 }
 
 export interface Repository {
