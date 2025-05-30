@@ -19,6 +19,7 @@ export interface RepositoryPanelProps {
   setSelectedRepo: (url: string | null) => void
   setRepoDialogOpen: (open: boolean) => void
   removeRepository?: (url: string) => void
+  onRepositorySelected?: (url: string) => void
 }
 
 export function RepositoryPanel({
@@ -27,7 +28,14 @@ export function RepositoryPanel({
   setSelectedRepo,
   setRepoDialogOpen,
   removeRepository,
+  onRepositorySelected,
 }: RepositoryPanelProps) {
+  // リポジトリを選択したときの処理
+  const handleRepoSelect = (url: string) => {
+    setSelectedRepo(url)
+    onRepositorySelected?.(url)
+  }
+
   return (
     <div className="h-full flex flex-col border-b">
       <div className="p-4 border-b">
@@ -40,9 +48,7 @@ export function RepositoryPanel({
             <>
               <Select
                 value={selectedRepo || ''}
-                onValueChange={(url) => {
-                  setSelectedRepo(url)
-                }}
+                onValueChange={handleRepoSelect}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="リポジトリを選択..." />

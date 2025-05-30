@@ -5,7 +5,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from '@/components/ui/resizable'
-import { Device, Repository, Firmware, Workflow } from '@/types/types'
+import { Device, Firmware, Repository } from '@/types/types'
 import { useRepositoriesStore } from '@/stores/repositories'
 import DevicePanel from './flasher/DevicePanel'
 import FirmwarePanel from './flasher/FirmwarePanel'
@@ -14,16 +14,25 @@ import { BottomBar } from './flasher/BottomBar'
 import ProgressDialog from './flasher/ProgressBarDialog'
 import RepositoryDialog from './flasher/RepositoryDialog'
 import { FlashProgress } from './flasher/types'
+import { extractRepoInfo } from '@/lib/repoUtils'
+import { apiClient } from '@/services/apiClientFactory'
+import { useLifetimeAbort } from '@/hooks/use-lifetime-abort'
 
 export default function Flasher() {
   // リポジトリストアからデータとアクションを取得
   const {
     repositories,
-    selectedRepository,
-    setSelectedRepository,
+    selectedRepositoryUrl,
+    setSelectedRepositoryUrl,
     addRepository: addRepoToStore,
     removeRepository: removeRepoFromStore,
-    updateRepository: updateRepoInStore,
+    getSelectedRepository,
+    // ワークフロー関連の状態とアクション
+    workflows,
+    isLoadingWorkflows,
+    setWorkflows,
+    setIsLoadingWorkflows,
+    setSelectedWorkflowId,
   } = useRepositoriesStore()
 
   // State
@@ -37,11 +46,6 @@ export default function Flasher() {
   )
   const [isLoadingFirmwares, setIsLoadingFirmwares] = useState(false)
 
-  // ワークフロー選択用の状態を追加
-  const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(
-    null
-  )
-
   const [isCompatible, setIsCompatible] = useState<boolean | null>(null)
   const [repoDialogOpen, setRepoDialogOpen] = useState(false)
   const [progressDialogOpen, setProgressDialogOpen] = useState(false)
@@ -54,6 +58,47 @@ export default function Flasher() {
   const [newRepoUrl, setNewRepoUrl] = useState('')
   const [newRepoPAT, setNewRepoPAT] = useState('')
   const [savePAT, setSavePAT] = useState(false)
+
+  const refLifetimeAbort = useLifetimeAbort()
+
+  // リポジトリのワークフローを取得する関数
+  const fetchWorkflows = async (repoUrl: string | null) => {
+    if (!repoUrl || refLifetimeAbort.current == null) return
+
+    setIsLoadingWorkflows(true)
+
+    try {
+      // リポジトリURLからリポジトリオブジェクトを作成
+      const repository: Repository = { url: repoUrl }
+
+      // ワークフローを取得
+      const workflowList = await apiClient.fetchWorkflows(
+        repository,
+        refLifetimeAbort.current.signal
+      )
+
+      // ストアに取得したワークフローを設定
+      setWorkflows(workflowList)
+
+      // 選択中のリポジトリにワークフローIDが設定されていなければ、
+      // 最初のワークフローを選択する
+      const selectedRepo = getSelectedRepository()
+      if (selectedRepo && !selectedRepo.workflowId && workflowList.length > 0) {
+        setSelectedWorkflowId(workflowList[0].id)
+      }
+    } catch (error) {
+      toast.error('ワークフローの取得に失敗しました', {
+        description:
+          error instanceof Error ? error.message : '不明なエラーが発生しました',
+        duration: 5000,
+      })
+
+      // エラー時はワークフローをクリア
+      setWorkflows([])
+    } finally {
+      setIsLoadingWorkflows(false)
+    }
+  }
 
   // Mock functions - replace with actual implementations
   const refreshDevices = async () => {
@@ -86,7 +131,7 @@ export default function Flasher() {
   }
 
   const loadFirmwares = async () => {
-    if (!selectedDevice || !selectedRepository) return
+    if (!selectedDevice || !selectedRepositoryUrl) return
 
     setIsLoadingFirmwares(true)
     setSelectedFirmware(null)
@@ -131,71 +176,63 @@ export default function Flasher() {
       return
     }
 
-    // GitHub URLのバリデーション
-    const githubRegex = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)/
-    const match = newRepoUrl.match(githubRegex)
+    try {
+      // リポジトリをストアに追加
+      addRepoToStore(newRepoUrl)
+      setRepoDialogOpen(false)
 
-    if (!match) {
+      // リポジトリが追加されたらワークフローを取得
+      await fetchWorkflows(newRepoUrl)
+
+      // 成功メッセージを表示
+      const repoInfo = extractRepoInfo(newRepoUrl)
+      if (repoInfo) {
+        toast.success(
+          `リポジトリ ${repoInfo.owner}/${repoInfo.repo} を追加しました`
+        )
+      } else {
+        toast.success('リポジトリを追加しました')
+      }
+
+      // フォームをリセット
+      setNewRepoUrl('')
+      setNewRepoPAT('')
+      setSavePAT(false)
+    } catch (error) {
+      // エラーメッセージを表示
       toast.error(
-        '有効なGitHub URLを入力してください (例: https://github.com/owner/repo)'
+        error instanceof Error ? error.message : '不明なエラーが発生しました'
       )
-      return
     }
-
-    const owner = match[1]
-    const repo = match[2]
-
-    // 既存のリポジトリと重複しないか確認
-    const isDuplicate = repositories.some(
-      (r) => r.owner === owner && r.repo === repo
-    )
-
-    if (isDuplicate) {
-      toast.error('このリポジトリは既に追加されています')
-      return
-    }
-
-    // 新しいリポジトリを作成
-    const newRepo: Repository = {
-      id: Date.now().toString(),
-      url: newRepoUrl,
-      owner,
-      repo,
-    }
-
-    // リポジトリリストに追加
-    addRepoToStore(newRepo)
-    setSelectedRepository(newRepo)
-    setRepoDialogOpen(false)
-
-    // 成功メッセージを表示
-    toast.success(`リポジトリ ${owner}/${repo} を追加しました`)
-
-    // フォームをリセット
-    setNewRepoUrl('')
-    setNewRepoPAT('')
-    setSavePAT(false)
   }
 
   // リポジトリの削除
-  const removeRepository = (id: string) => {
-    // 削除するリポジトリを確認
-    const repoToRemove = repositories.find((r) => r.id === id)
-    if (!repoToRemove) return
+  const removeRepository = (url: string) => {
+    try {
+      // リポジトリ情報を取得
+      const repoInfo = extractRepoInfo(url)
 
-    // リポジトリリストから削除
-    removeRepoFromStore(repoToRemove.id)
+      // リポジトリリストから削除
+      removeRepoFromStore(url)
 
-    // 成功メッセージを表示
-    toast.success(
-      `リポジトリ ${repoToRemove.owner}/${repoToRemove.repo} を削除しました`
-    )
+      // 成功メッセージを表示
+      if (repoInfo) {
+        toast.success(
+          `リポジトリ ${repoInfo.owner}/${repoInfo.repo} を削除しました`
+        )
+      } else {
+        toast.success('リポジトリを削除しました')
+      }
 
-    // 選択中のリポジトリが削除される場合は選択解除
-    if (selectedRepository?.id === id) {
-      setSelectedRepository(null)
-      setFirmwares([])
-      setSelectedFirmware(null)
+      // 選択中のリポジトリが削除された場合は選択解除
+      if (selectedRepositoryUrl === url) {
+        setFirmwares([])
+        setSelectedFirmware(null)
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : '不明なエラーが発生しました'
+      )
     }
   }
 
@@ -291,27 +328,32 @@ export default function Flasher() {
     flashFirmware()
   }
 
-  // 選択されたワークフローの更新を処理する関数
-  const handleWorkflowSelect = (workflow: Workflow | null) => {
-    setSelectedWorkflow(workflow)
+  // 選択されたワークフローIDの更新を処理する関数
+  const handleWorkflowSelect = (workflowId: number | null) => {
+    // ワークフローIDをストアに設定
+    setSelectedWorkflowId(workflowId)
 
-    // 選択されたリポジトリとワークフローIDを保存
-    if (
-      selectedRepository &&
-      workflow &&
-      selectedRepository.workflowId !== workflow.id
-    ) {
-      const updatedRepo = {
-        ...selectedRepository,
-        workflowId: workflow.id,
+    // ワークフロー選択時のトースト表示
+    if (workflowId) {
+      const selectedWorkflow = workflows.find((w) => w.id === workflowId)
+      if (selectedWorkflow) {
+        const repoInfo = extractRepoInfo(selectedRepositoryUrl || '')
+        if (repoInfo) {
+          toast.success(
+            `ワークフロー「${selectedWorkflow.name}」を選択しました`,
+            {
+              duration: 3000,
+            }
+          )
+        }
       }
-      updateRepoInStore(updatedRepo)
-
-      toast.success(`ワークフロー「${workflow.name}」を保存しました`, {
-        description: `リポジトリ ${selectedRepository.owner}/${selectedRepository.repo} のデフォルトワークフローとして保存されました`,
-        duration: 3000,
-      })
     }
+  }
+
+  // リポジトリが選択されたときのコールバック
+  const handleRepositorySelected = (repoUrl: string) => {
+    // 選択されたリポジトリのワークフローを取得
+    fetchWorkflows(repoUrl)
   }
 
   // 初期化処理
@@ -322,13 +364,13 @@ export default function Flasher() {
 
   // リポジトリまたはデバイスが変更されたらファームウェア一覧を更新
   useEffect(() => {
-    if (selectedDevice && selectedRepository) {
+    if (selectedDevice && selectedRepositoryUrl) {
       loadFirmwares()
     } else {
       setFirmwares([])
       setSelectedFirmware(null)
     }
-  }, [selectedDevice, selectedRepository])
+  }, [selectedDevice, selectedRepositoryUrl])
 
   // 互換性チェック
   useEffect(() => {
@@ -359,10 +401,11 @@ export default function Flasher() {
               <ResizablePanel defaultSize={40} minSize={25}>
                 <RepositoryPanel
                   repositories={repositories}
-                  selectedRepo={selectedRepository}
-                  setSelectedRepo={setSelectedRepository}
+                  selectedRepo={selectedRepositoryUrl}
+                  setSelectedRepo={setSelectedRepositoryUrl}
                   setRepoDialogOpen={setRepoDialogOpen}
                   removeRepository={removeRepository}
+                  onRepositorySelected={handleRepositorySelected}
                 />
               </ResizablePanel>
 
@@ -372,7 +415,7 @@ export default function Flasher() {
               <ResizablePanel defaultSize={60}>
                 <FirmwarePanel
                   selectedDevice={selectedDevice}
-                  selectedRepo={selectedRepository}
+                  selectedRepo={selectedRepositoryUrl}
                   firmwares={firmwares}
                   selectedFirmware={selectedFirmware}
                   setSelectedFirmware={setSelectedFirmware}
@@ -400,8 +443,9 @@ export default function Flasher() {
                       toast.info('新しいファームウェアはありませんでした')
                     }
                   }}
-                  selectedWorkflow={selectedWorkflow}
-                  setSelectedWorkflow={handleWorkflowSelect}
+                  setSelectedWorkflowId={handleWorkflowSelect}
+                  workflows={workflows}
+                  isLoadingWorkflows={isLoadingWorkflows}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>

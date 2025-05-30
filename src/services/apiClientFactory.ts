@@ -16,9 +16,7 @@ export const isTestMode = (): boolean => {
     return true
   }
 
-  console.log('USE_MOCK_API is not set, using real API client')
-
-  return true
+  return false
 }
 
 /**

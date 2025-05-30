@@ -16,38 +16,44 @@ import {
   RefreshCw,
   Download,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { useLifetimeAbort } from '@/hooks/use-lifetime-abort'
 import { apiClient } from '@/services/apiClientFactory'
+import { useRepositoriesStore } from '@/stores/repositories'
 
 // FirmwarePanel Component
 export interface FirmwarePanelProps {
   selectedDevice: Device | null
-  selectedRepo: Repository | null
+  selectedRepo: string | null
   firmwares: Firmware[]
   selectedFirmware: Firmware | null
   setSelectedFirmware: (firmware: Firmware | null) => void
   isLoadingFirmwares: boolean
   isCompatible: boolean | null
   onRefreshFirmwares?: (firmwares: Firmware[]) => void
-  selectedWorkflow?: any | null
-  setSelectedWorkflow?: (workflow: any | null) => void
+  // selectedWorkflowを削除し、ワークフローIDを設定する関数に変更
+  setSelectedWorkflowId: (workflowId: number | null) => void
+  workflows: Workflow[]
+  isLoadingWorkflows: boolean
 }
 
 // GitHubのAPIを使って最新の成功したActionsのartifactsを取得する関数
 const fetchLatestFirmware = async (
-  repository: Repository,
+  repositoryUrl: string,
   workflowId: number | null,
   signal: AbortSignal
 ): Promise<Firmware[]> => {
-  if (!repository) {
+  if (!repositoryUrl) {
     throw new Error('リポジトリが選択されていません')
   }
 
   if (!workflowId) {
     throw new Error('ワークフローが選択されていません')
   }
+
+  // リポジトリオブジェクトを作成
+  const repository: Repository = { url: repositoryUrl }
 
   // 特定のワークフローの最新の成功したランを取得
   const workflowRuns = await apiClient.fetchWorkflowRuns(
@@ -103,69 +109,19 @@ export default function FirmwarePanel({
   isLoadingFirmwares,
   isCompatible,
   onRefreshFirmwares,
-  selectedWorkflow,
-  setSelectedWorkflow,
+  setSelectedWorkflowId,
+  workflows,
+  isLoadingWorkflows,
 }: FirmwarePanelProps) {
   const [isLoadingLatestFirmwares, setIsLoadingLatestFirmwares] =
     useState(false)
-  const [workflows, setWorkflows] = useState<Workflow[]>([])
-  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false)
+
+  // リポジトリストアからselectedWorkflowを取得
+  const { getSelectedWorkflow } = useRepositoriesStore()
+  // 現在選択されているワークフロー
+  const selectedWorkflow = getSelectedWorkflow()
 
   const refLifetimeAbort = useLifetimeAbort()
-
-  // リポジトリが変更されたときにワークフローを取得する
-  useEffect(() => {
-    if (!selectedRepo) return
-
-    console.log(selectedRepo)
-
-    const abort = new AbortController()
-
-    const fetchRepositoryWorkflows = async () => {
-      setIsLoadingWorkflows(true)
-      try {
-        const workflowList = await apiClient.fetchWorkflows(
-          selectedRepo,
-          abort.signal
-        )
-        setWorkflows(workflowList)
-
-        // リポジトリに保存されたワークフローIDがあればそれを選択
-        if (selectedRepo.workflowId) {
-          const savedWorkflow = workflowList.find(
-            (w) => w.id === selectedRepo.workflowId
-          )
-          if (savedWorkflow && setSelectedWorkflow) {
-            setSelectedWorkflow(savedWorkflow)
-          }
-        }
-        // ワークフローが1つ以上あり、まだ選択されていなければ最初のものを選択
-        else if (
-          workflowList.length > 0 &&
-          setSelectedWorkflow &&
-          !selectedWorkflow
-        ) {
-          setSelectedWorkflow(workflowList[0])
-        }
-      } catch (error) {
-        toast.error('ワークフローの取得に失敗しました', {
-          description:
-            error instanceof Error
-              ? error.message
-              : '不明なエラーが発生しました',
-          duration: 5000,
-        })
-      } finally {
-        setIsLoadingWorkflows(false)
-      }
-    }
-
-    fetchRepositoryWorkflows()
-
-    return () => {
-      abort.abort()
-    }
-  }, [selectedRepo])
 
   // 最新のファームウェアを取得するハンドラー
   const handleGetLatest = async () => {
@@ -242,12 +198,8 @@ export default function FirmwarePanel({
                 <Select
                   value={selectedWorkflow?.id?.toString()}
                   onValueChange={(value) => {
-                    const workflow = workflows.find(
-                      (w) => w.id === parseInt(value)
-                    )
-                    if (setSelectedWorkflow) {
-                      setSelectedWorkflow(workflow || null)
-                    }
+                    // ワークフローIDだけを親コンポーネントに渡す
+                    setSelectedWorkflowId(parseInt(value))
                   }}
                   disabled={isLoadingWorkflows || workflows.length === 0}
                 >
