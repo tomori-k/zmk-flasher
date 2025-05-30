@@ -1,16 +1,20 @@
 export interface Device {
   id: string
   name: string
-  side?: 'left' | 'right'
-  pid: string
-  vid: string
+  manufacturer: string
+  boardId?: string
+  familyId?: string
+  selectedPort?: string
+  ports?: string[]
 }
 
 export interface Repository {
   id: string
-  url: string
+  name: string
   owner: string
   repo: string
+  branch?: string
+  workflowId?: number // ここを追加
 }
 
 export interface Firmware {
@@ -19,8 +23,20 @@ export interface Firmware {
   path: string
   buildDate: string
   branch: string
+  commitMessage?: string
   boardId?: string
   familyId?: string
   size: number
-  commitMessage?: string
+}
+
+export interface Workflow {
+  id: number
+  name: string
+  path: string
+  state: string
+  created_at: string
+  updated_at: string
+  url: string
+  html_url: string
+  badge_url: string
 }

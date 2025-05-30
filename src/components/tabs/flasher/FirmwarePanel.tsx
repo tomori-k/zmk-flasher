@@ -1,5 +1,5 @@
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
-import { Device, Repository, Firmware } from '@/types/types'
+import { Device, Repository, Firmware, Workflow } from '@/types/types'
 import { ScrollArea } from '@radix-ui/react-scroll-area'
 import {
   Select,
@@ -16,9 +16,10 @@ import {
   RefreshCw,
   Download,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { useLifetimeAbort } from '@/hooks/use-lifetime-abort'
+import { apiClient } from '@/services/apiClientFactory'
 
 // FirmwarePanel Component
 export interface FirmwarePanelProps {
@@ -30,102 +31,28 @@ export interface FirmwarePanelProps {
   isLoadingFirmwares: boolean
   isCompatible: boolean | null
   onRefreshFirmwares?: (firmwares: Firmware[]) => void
-}
-
-async function fetchWorkflows(
-  repository: Repository,
-  signal: AbortSignal,
-  page: number = 1,
-  perPage: number = 10
-): Promise<any[]> {
-  const response = await fetch(
-    `https://api.github.com/repos/${repository.owner}/${repository.repo}/actions/workflows?per_page=${perPage}&page=${page}`,
-    { signal }
-  )
-  if (!response.ok) {
-    throw new Error(
-      `ワークフローの取得に失敗しました (${
-        response.status
-      }): ${await response.text()}`
-    )
-  }
-  // TODO: Zod で API レスポンスの検証をしたい&帰値の型付けしたい。
-  const data = await response.json()
-  return data.workflows || []
-}
-
-async function fetchWorkflowRuns(
-  repository: Repository,
-  workflowId: number,
-  signal: AbortSignal,
-  page: number = 1,
-  perPage: number = 10
-): Promise<any[]> {
-  const response = await fetch(
-    `https://api.github.com/repos/${repository.owner}/${repository.repo}/actions/workflows/${workflowId}/runs?per_page=${perPage}&page=${page}`,
-    { signal }
-  )
-  if (!response.ok) {
-    throw new Error(
-      `ワークフローランの取得に失敗しました (${
-        response.status
-      }): ${await response.text()}`
-    )
-  }
-  const data = await response.json()
-  return data.workflow_runs || []
-}
-
-async function fetchWorkflowRunsArifacts(
-  repository: Repository,
-  workflowRunId: number,
-  signal: AbortSignal
-): Promise<any[]> {
-  const response = await fetch(
-    `https://api.github.com/repos/${repository.owner}/${repository.repo}/actions/runs/${workflowRunId}/artifacts`,
-    { signal }
-  )
-  if (!response.ok) {
-    throw new Error(
-      `Artifactsの取得に失敗しました (${
-        response.status
-      }): ${await response.text()}`
-    )
-  }
-  const data = await response.json()
-  return data.artifacts || []
+  selectedWorkflow?: any | null
+  setSelectedWorkflow?: (workflow: any | null) => void
 }
 
 // GitHubのAPIを使って最新の成功したActionsのartifactsを取得する関数
 const fetchLatestFirmware = async (
   repository: Repository,
+  workflowId: number | null,
   signal: AbortSignal
 ): Promise<Firmware[]> => {
   if (!repository) {
     throw new Error('リポジトリが選択されていません')
   }
 
-  // "Build ZMK firmware" という名前のワークフローを探す
-  // 最初の10件でなかったらエラーを投げる
-  const PerPage = 10
-  const workflows = await fetchWorkflows(repository, signal, 1, PerPage)
-
-  const firmwareBuildWorkflow = workflows.find(
-    (workflow: any) => workflow.name === 'Build ZMK firmware'
-  )
-
-  // 見つかった場合はループを抜ける
-  if (firmwareBuildWorkflow == null) {
-    throw new Error(
-      '"Build ZMK firmware" という名前のワークフローが見つかりません'
-    )
+  if (!workflowId) {
+    throw new Error('ワークフローが選択されていません')
   }
 
   // 特定のワークフローの最新の成功したランを取得
-
-  const workflowRuns = await fetchWorkflowRuns(
+  const workflowRuns = await apiClient.fetchWorkflowRuns(
     repository,
-    firmwareBuildWorkflow.id,
+    workflowId,
     signal,
     1,
     1
@@ -139,7 +66,7 @@ const fetchLatestFirmware = async (
 
   // 最新のワークフローランからartifactsを取得
   const latestRunId = workflowRuns[0].id
-  const artifacts = await fetchWorkflowRunsArifacts(
+  const artifacts = await apiClient.fetchWorkflowRunsArtifacts(
     repository,
     latestRunId,
     signal
@@ -176,11 +103,69 @@ export default function FirmwarePanel({
   isLoadingFirmwares,
   isCompatible,
   onRefreshFirmwares,
+  selectedWorkflow,
+  setSelectedWorkflow,
 }: FirmwarePanelProps) {
   const [isLoadingLatestFirmwares, setIsLoadingLatestFirmwares] =
     useState(false)
+  const [workflows, setWorkflows] = useState<Workflow[]>([])
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false)
 
   const refLifetimeAbort = useLifetimeAbort()
+
+  // リポジトリが変更されたときにワークフローを取得する
+  useEffect(() => {
+    if (!selectedRepo) return
+
+    console.log(selectedRepo)
+
+    const abort = new AbortController()
+
+    const fetchRepositoryWorkflows = async () => {
+      setIsLoadingWorkflows(true)
+      try {
+        const workflowList = await apiClient.fetchWorkflows(
+          selectedRepo,
+          abort.signal
+        )
+        setWorkflows(workflowList)
+
+        // リポジトリに保存されたワークフローIDがあればそれを選択
+        if (selectedRepo.workflowId) {
+          const savedWorkflow = workflowList.find(
+            (w) => w.id === selectedRepo.workflowId
+          )
+          if (savedWorkflow && setSelectedWorkflow) {
+            setSelectedWorkflow(savedWorkflow)
+          }
+        }
+        // ワークフローが1つ以上あり、まだ選択されていなければ最初のものを選択
+        else if (
+          workflowList.length > 0 &&
+          setSelectedWorkflow &&
+          !selectedWorkflow
+        ) {
+          setSelectedWorkflow(workflowList[0])
+        }
+      } catch (error) {
+        toast.error('ワークフローの取得に失敗しました', {
+          description:
+            error instanceof Error
+              ? error.message
+              : '不明なエラーが発生しました',
+          duration: 5000,
+        })
+      } finally {
+        setIsLoadingWorkflows(false)
+      }
+    }
+
+    fetchRepositoryWorkflows()
+
+    return () => {
+      abort.abort()
+    }
+  }, [selectedRepo])
 
   // 最新のファームウェアを取得するハンドラー
   const handleGetLatest = async () => {
@@ -192,11 +177,17 @@ export default function FirmwarePanel({
       return
     }
 
+    if (!selectedWorkflow) {
+      toast.error('ワークフローが選択されていません')
+      return
+    }
+
     setIsLoadingLatestFirmwares(true)
 
     try {
       const newFirmwares = await fetchLatestFirmware(
         selectedRepo,
+        selectedWorkflow.id,
         refLifetimeAbort.current.signal
       )
 
@@ -240,13 +231,48 @@ export default function FirmwarePanel({
               </div>
             ) : (
               <div className="space-y-4">
+                {/* ワークフロー選択セクションを追加 */}
+                <div className="flex justify-between items-center">
+                  <h4 className="text-sm font-medium">ワークフロー選択</h4>
+                  {isLoadingWorkflows && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                </div>
+
+                <Select
+                  value={selectedWorkflow?.id?.toString()}
+                  onValueChange={(value) => {
+                    const workflow = workflows.find(
+                      (w) => w.id === parseInt(value)
+                    )
+                    if (setSelectedWorkflow) {
+                      setSelectedWorkflow(workflow || null)
+                    }
+                  }}
+                  disabled={isLoadingWorkflows || workflows.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="ワークフローを選択..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workflows.map((workflow) => (
+                      <SelectItem
+                        key={workflow.id}
+                        value={workflow.id.toString()}
+                      >
+                        {workflow.name} ({workflow.path})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
                 <div className="flex justify-between items-center">
                   <h4 className="text-sm font-medium">ファームウェア選択</h4>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleGetLatest}
-                    disabled={isLoadingLatestFirmwares}
+                    disabled={isLoadingLatestFirmwares || !selectedWorkflow}
                   >
                     {isLoadingLatestFirmwares ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />

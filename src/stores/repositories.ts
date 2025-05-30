@@ -12,6 +12,7 @@ interface RepositoriesState {
   setSelectedRepository: (repository: Repository | null) => void
   addRepository: (repository: Repository) => void
   removeRepository: (id: string) => void
+  updateRepository: (repository: Repository) => void
 
   // 初期化
   initialize: () => void
@@ -19,12 +20,13 @@ interface RepositoriesState {
 
 // サンプルリポジトリデータ
 const SAMPLE_REPOSITORIES: Repository[] = [
-  {
-    id: '1',
-    url: 'https://github.com/zmkfirmware/zmk',
-    owner: 'zmkfirmware',
-    repo: 'zmk',
-  },
+  // {
+  //   id: '1',
+  //   name: 'ZMK Firmware',
+  //   repo: 'https://github.com/zmkfirmware/zmk',
+  //   owner: 'zmkfirmware',
+  //   repo: 'zmk',
+  // },
 ]
 
 // リポジトリストアの作成
@@ -53,6 +55,22 @@ export const useRepositoriesStore = create<RepositoriesState>((set) => ({
           ? newRepositories.length > 0
             ? newRepositories[0]
             : null
+          : state.selectedRepository
+
+      return {
+        repositories: newRepositories,
+        selectedRepository: newSelectedRepository,
+      }
+    }),
+
+  updateRepository: (updatedRepository) =>
+    set((state) => {
+      const newRepositories = state.repositories.map((repository) =>
+        repository.id === updatedRepository.id ? updatedRepository : repository
+      )
+      const newSelectedRepository =
+        state.selectedRepository?.id === updatedRepository.id
+          ? updatedRepository
           : state.selectedRepository
 
       return {

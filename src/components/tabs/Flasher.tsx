@@ -5,7 +5,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from '@/components/ui/resizable'
-import { Device, Repository, Firmware } from '@/types/types'
+import { Device, Repository, Firmware, Workflow } from '@/types/types'
 import { useRepositoriesStore } from '@/stores/repositories'
 import DevicePanel from './flasher/DevicePanel'
 import FirmwarePanel from './flasher/FirmwarePanel'
@@ -23,6 +23,7 @@ export default function Flasher() {
     setSelectedRepository,
     addRepository: addRepoToStore,
     removeRepository: removeRepoFromStore,
+    updateRepository: updateRepoInStore,
   } = useRepositoriesStore()
 
   // State
@@ -35,6 +36,11 @@ export default function Flasher() {
     null
   )
   const [isLoadingFirmwares, setIsLoadingFirmwares] = useState(false)
+
+  // ワークフロー選択用の状態を追加
+  const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(
+    null
+  )
 
   const [isCompatible, setIsCompatible] = useState<boolean | null>(null)
   const [repoDialogOpen, setRepoDialogOpen] = useState(false)
@@ -285,6 +291,29 @@ export default function Flasher() {
     flashFirmware()
   }
 
+  // 選択されたワークフローの更新を処理する関数
+  const handleWorkflowSelect = (workflow: Workflow | null) => {
+    setSelectedWorkflow(workflow)
+
+    // 選択されたリポジトリとワークフローIDを保存
+    if (
+      selectedRepository &&
+      workflow &&
+      selectedRepository.workflowId !== workflow.id
+    ) {
+      const updatedRepo = {
+        ...selectedRepository,
+        workflowId: workflow.id,
+      }
+      updateRepoInStore(updatedRepo)
+
+      toast.success(`ワークフロー「${workflow.name}」を保存しました`, {
+        description: `リポジトリ ${selectedRepository.owner}/${selectedRepository.repo} のデフォルトワークフローとして保存されました`,
+        duration: 3000,
+      })
+    }
+  }
+
   // 初期化処理
   useEffect(() => {
     // デバイス一覧の取得
@@ -371,6 +400,8 @@ export default function Flasher() {
                       toast.info('新しいファームウェアはありませんでした')
                     }
                   }}
+                  selectedWorkflow={selectedWorkflow}
+                  setSelectedWorkflow={handleWorkflowSelect}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
