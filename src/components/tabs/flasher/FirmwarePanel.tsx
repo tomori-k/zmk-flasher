@@ -1,6 +1,6 @@
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Device, Repository, Firmware, Workflow } from '@/types/types'
-import { ScrollArea } from '@radix-ui/react-scroll-area'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectTrigger,
@@ -178,7 +178,7 @@ export default function FirmwarePanel({
         <h3 className="font-semibold">③ ファームウェア一覧</h3>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 h-full pb-16">
         <div className="p-4">
           {selectedDevice && selectedRepo ? (
             isLoadingFirmwares ? (
