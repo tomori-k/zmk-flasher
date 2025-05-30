@@ -9,12 +9,8 @@ export interface Device {
 }
 
 export interface Repository {
-  id: string
-  name: string
-  owner: string
-  repo: string
-  branch?: string
-  workflowId?: number // ここを追加
+  url: string
+  workflowId?: number
 }
 
 export interface Firmware {

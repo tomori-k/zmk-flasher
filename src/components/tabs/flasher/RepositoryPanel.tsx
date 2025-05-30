@@ -10,14 +10,15 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 import { PlusCircle, Trash } from 'lucide-react'
+import { getRepoDisplayName } from '@/lib/repoUtils'
 
 // RepositoryPanel Component
 export interface RepositoryPanelProps {
   repositories: Repository[]
-  selectedRepo: Repository | null
-  setSelectedRepo: (repo: Repository | null) => void
+  selectedRepo: string | null
+  setSelectedRepo: (url: string | null) => void
   setRepoDialogOpen: (open: boolean) => void
-  removeRepository?: (id: string) => void
+  removeRepository?: (url: string) => void
 }
 
 export function RepositoryPanel({
@@ -38,10 +39,9 @@ export function RepositoryPanel({
           {repositories.length > 0 ? (
             <>
               <Select
-                value={selectedRepo?.id}
-                onValueChange={(value) => {
-                  const repo = repositories.find((r) => r.id === value)
-                  setSelectedRepo(repo || null)
+                value={selectedRepo || ''}
+                onValueChange={(url) => {
+                  setSelectedRepo(url)
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -49,8 +49,8 @@ export function RepositoryPanel({
                 </SelectTrigger>
                 <SelectContent>
                   {repositories.map((repo) => (
-                    <SelectItem key={repo.id} value={repo.id}>
-                      {repo.owner}/{repo.repo}
+                    <SelectItem key={repo.url} value={repo.url}>
+                      {getRepoDisplayName(repo.url)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -62,12 +62,12 @@ export function RepositoryPanel({
                   size="sm"
                   className="gap-2 self-end"
                   onClick={() => {
+                    const displayName = getRepoDisplayName(selectedRepo)
                     toast.custom((t) => (
                       <div className="p-4 bg-card border rounded-lg shadow-lg">
                         <h3 className="font-medium mb-2">リポジトリの削除</h3>
                         <p className="text-sm mb-4">
-                          {selectedRepo.owner}/{selectedRepo.repo}{' '}
-                          を削除しますか？
+                          {displayName} を削除しますか？
                         </p>
                         <div className="flex justify-end gap-2">
                           <Button
@@ -81,7 +81,7 @@ export function RepositoryPanel({
                             variant="destructive"
                             size="sm"
                             onClick={() => {
-                              removeRepository(selectedRepo.id)
+                              removeRepository(selectedRepo)
                               toast.dismiss(t)
                             }}
                           >

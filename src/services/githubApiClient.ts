@@ -1,4 +1,5 @@
 import { Repository, Workflow } from '@/types/types'
+import { extractRepoInfo } from '@/lib/repoUtils'
 
 /**
  * GitHub API クライアントのインターフェース
@@ -44,8 +45,15 @@ export const githubApiClient: GitHubApiClient = {
     page: number = 1,
     perPage: number = 10
   ): Promise<Workflow[]> {
+    const repoInfo = extractRepoInfo(repository.url)
+    if (!repoInfo) {
+      throw new Error('無効なリポジトリURLです')
+    }
+
+    const { owner, repo } = repoInfo
+
     const response = await fetch(
-      `https://api.github.com/repos/${repository.owner}/${repository.repo}/actions/workflows?per_page=${perPage}&page=${page}`,
+      `https://api.github.com/repos/${owner}/${repo}/actions/workflows?per_page=${perPage}&page=${page}`,
       { signal }
     )
 
@@ -68,8 +76,15 @@ export const githubApiClient: GitHubApiClient = {
     page: number = 1,
     perPage: number = 10
   ): Promise<any[]> {
+    const repoInfo = extractRepoInfo(repository.url)
+    if (!repoInfo) {
+      throw new Error('無効なリポジトリURLです')
+    }
+
+    const { owner, repo } = repoInfo
+
     const response = await fetch(
-      `https://api.github.com/repos/${repository.owner}/${repository.repo}/actions/workflows/${workflowId}/runs?per_page=${perPage}&page=${page}`,
+      `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowId}/runs?per_page=${perPage}&page=${page}`,
       { signal }
     )
 
@@ -90,8 +105,15 @@ export const githubApiClient: GitHubApiClient = {
     workflowRunId: number,
     signal: AbortSignal
   ): Promise<any[]> {
+    const repoInfo = extractRepoInfo(repository.url)
+    if (!repoInfo) {
+      throw new Error('無効なリポジトリURLです')
+    }
+
+    const { owner, repo } = repoInfo
+
     const response = await fetch(
-      `https://api.github.com/repos/${repository.owner}/${repository.repo}/actions/runs/${workflowRunId}/artifacts`,
+      `https://api.github.com/repos/${owner}/${repo}/actions/runs/${workflowRunId}/artifacts`,
       { signal }
     )
 

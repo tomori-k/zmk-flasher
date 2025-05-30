@@ -1,5 +1,6 @@
 import { Repository, Workflow } from '@/types/types'
 import { GitHubApiClient } from './githubApiClient'
+import { extractRepoInfo } from '@/lib/repoUtils'
 
 /**
  * GitHub API クライアントのモック実装
@@ -12,6 +13,12 @@ export const mockGithubApiClient: GitHubApiClient = {
     page: number = 1,
     perPage: number = 10
   ): Promise<Workflow[]> {
+    // リポジトリの検証 (実際のAPIと同じ振る舞いを模倣)
+    const repoInfo = extractRepoInfo(repository.url)
+    if (!repoInfo) {
+      throw new Error('無効なリポジトリURLです')
+    }
+
     // テスト用のモックデータ
     return [
       {
@@ -21,10 +28,9 @@ export const mockGithubApiClient: GitHubApiClient = {
         state: 'active',
         created_at: '2025-01-01T00:00:00Z',
         updated_at: '2025-01-01T00:00:00Z',
-        url: 'https://api.github.com/repos/owner/repo/actions/workflows/1',
-        html_url: 'https://github.com/owner/repo/actions/workflows/build.yml',
-        badge_url:
-          'https://github.com/owner/repo/workflows/Build%20ZMK%20firmware/badge.svg',
+        url: `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/1`,
+        html_url: `https://github.com/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/build.yml`,
+        badge_url: `https://github.com/${repoInfo.owner}/${repoInfo.repo}/workflows/Build%20ZMK%20firmware/badge.svg`,
       },
       {
         id: 2,
@@ -33,10 +39,9 @@ export const mockGithubApiClient: GitHubApiClient = {
         state: 'active',
         created_at: '2025-01-02T00:00:00Z',
         updated_at: '2025-01-02T00:00:00Z',
-        url: 'https://api.github.com/repos/owner/repo/actions/workflows/2',
-        html_url: 'https://github.com/owner/repo/actions/workflows/custom.yml',
-        badge_url:
-          'https://github.com/owner/repo/workflows/Build%20Custom%20firmware/badge.svg',
+        url: `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/2`,
+        html_url: `https://github.com/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/custom.yml`,
+        badge_url: `https://github.com/${repoInfo.owner}/${repoInfo.repo}/workflows/Build%20Custom%20firmware/badge.svg`,
       },
     ]
   },
@@ -48,6 +53,12 @@ export const mockGithubApiClient: GitHubApiClient = {
     page: number = 1,
     perPage: number = 10
   ): Promise<any[]> {
+    // リポジトリの検証
+    const repoInfo = extractRepoInfo(repository.url)
+    if (!repoInfo) {
+      throw new Error('無効なリポジトリURLです')
+    }
+
     // テスト用のモックデータ
     return [
       {
@@ -71,6 +82,12 @@ export const mockGithubApiClient: GitHubApiClient = {
     workflowRunId: number,
     signal: AbortSignal
   ): Promise<any[]> {
+    // リポジトリの検証
+    const repoInfo = extractRepoInfo(repository.url)
+    if (!repoInfo) {
+      throw new Error('無効なリポジトリURLです')
+    }
+
     // テスト用のモックデータ
     return [
       {
@@ -79,8 +96,7 @@ export const mockGithubApiClient: GitHubApiClient = {
         size_in_bytes: 245760,
         created_at: '2025-05-29T00:00:00Z',
         updated_at: '2025-05-29T00:00:00Z',
-        archive_download_url:
-          'https://api.github.com/repos/owner/repo/actions/artifacts/201/zip',
+        archive_download_url: `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/artifacts/201/zip`,
       },
       {
         id: 202,
@@ -88,8 +104,7 @@ export const mockGithubApiClient: GitHubApiClient = {
         size_in_bytes: 245760,
         created_at: '2025-05-29T00:00:00Z',
         updated_at: '2025-05-29T00:00:00Z',
-        archive_download_url:
-          'https://api.github.com/repos/owner/repo/actions/artifacts/202/zip',
+        archive_download_url: `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/artifacts/202/zip`,
       },
     ]
   },
