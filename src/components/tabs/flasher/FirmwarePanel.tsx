@@ -38,11 +38,12 @@ export interface FirmwarePanelProps {
   isLoadingWorkflows: boolean
 }
 
-// GitHubのAPIを使って最新の成功したActionsのartifactsを取得する関数
+// GitHubのAPIを使って最新の複数の成功したActionsのartifactsを取得する関数
 const fetchLatestFirmware = async (
   repositoryUrl: string,
   workflowId: number | null,
-  signal: AbortSignal
+  signal: AbortSignal,
+  runsCount: number = 3 // 取得するワークフローランの数（デフォルトは3つ）
 ): Promise<Firmware[]> => {
   if (!repositoryUrl) {
     throw new Error('リポジトリが選択されていません')
@@ -55,13 +56,13 @@ const fetchLatestFirmware = async (
   // リポジトリオブジェクトを作成
   const repository: Repository = { url: repositoryUrl }
 
-  // 特定のワークフローの最新の成功したランを取得
+  // 指定されたワークフローの最新の成功したランを複数取得
   const workflowRuns = await apiClient.fetchWorkflowRuns(
     repository,
     workflowId,
     signal,
-    1,
-    1
+    1, // ページ番号
+    runsCount // 取得する数
   )
 
   if (workflowRuns.length === 0) {
@@ -70,34 +71,43 @@ const fetchLatestFirmware = async (
     )
   }
 
-  // 最新のワークフローランからartifactsを取得
-  const latestRunId = workflowRuns[0].id
-  const artifacts = await apiClient.fetchWorkflowRunsArtifacts(
-    repository,
-    latestRunId,
-    signal
-  )
+  // 複数のワークフローランからartifactsを取得して結合
+  const firmwares: Firmware[] = []
 
-  if (artifacts.length === 0) {
+  for (const run of workflowRuns) {
+      const artifacts = await apiClient.fetchWorkflowRunsArtifacts(
+        repository,
+        run.id,
+        signal
+      )
+
+      if (artifacts.length > 0) {
+        // コミットメッセージを取得
+        const commitMessage = run.head_commit?.message || 'コミットメッセージなし'
+
+        // このランのartifactsをFirmwareオブジェクトに変換
+        const runFirmwares = artifacts.map((artifact: any) => ({
+          id: `github-artifact-${artifact.id}`,
+          name: artifact.name,
+          path: artifact.archive_download_url,
+          buildDate: artifact.created_at,
+          branch: run.head_branch || 'unknown',
+          commitMessage,
+          size: artifact.size_in_bytes,
+          // Note: boardIdとfamilyIdはartifact名から推測するか、
+          // メタデータが利用可能であれば追加する必要があります
+        }))
+
+        // 結果配列に追加
+        firmwares.push(...runFirmwares)
+      }
+  }
+
+  if (firmwares.length === 0) {
     throw new Error('Artifactsが見つかりません')
   }
 
-  // コミットメッセージを取得
-  const commitMessage =
-    workflowRuns[0].head_commit?.message || 'コミットメッセージなし'
-
-  // artifactsをFirmwareオブジェクトに変換
-  return artifacts.map((artifact: any) => ({
-    id: `github-artifact-${artifact.id}`,
-    name: artifact.name,
-    path: artifact.archive_download_url,
-    buildDate: artifact.created_at,
-    branch: workflowRuns[0].head_branch || 'unknown',
-    commitMessage,
-    size: artifact.size_in_bytes,
-    // Note: boardIdとfamilyIdはartifact名から推測するか、
-    // メタデータが利用可能であれば追加する必要があります
-  }))
+  return firmwares
 }
 
 export default function FirmwarePanel({
