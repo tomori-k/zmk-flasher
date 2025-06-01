@@ -3,6 +3,7 @@ import { Device, Firmware } from '@/types/types'
 import { Progress } from '@radix-ui/react-progress'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import { FlashProgress } from './types'
+import { useTranslation } from 'react-i18next'
 
 // BottomBar Component
 export interface BottomBarProps {
@@ -20,13 +21,18 @@ export function BottomBar({
   flashProgress,
   flashFirmware,
 }: BottomBarProps) {
+  const { t } = useTranslation()
+
   return (
     <div className="border-t bg-muted/40 p-2 flex items-center justify-between">
       <div className="flex items-center gap-2 px-2">
-        <h3 className="text-sm font-medium">⑤ 書き込み操作</h3>
+        <h3 className="text-sm font-medium">
+          ⑤ {t('flasher.bottomBar.title', '書き込み操作')}
+        </h3>
         {flashProgress.status === 'success' && (
           <span className="text-sm text-green-600 flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" /> 書き込み成功
+            <CheckCircle2 className="h-3 w-3" />{' '}
+            {t('flasher.bottomBar.success', '書き込み成功')}
           </span>
         )}
       </div>
@@ -54,7 +60,7 @@ export function BottomBar({
           {flashProgress.status === 'flashing' && (
             <Loader2 className="h-4 w-4 animate-spin" />
           )}
-          Flash!
+          {t('flasher.bottomBar.flash')}
         </Button>
       </div>
     </div>

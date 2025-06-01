@@ -8,5 +8,76 @@
     "language": "Language",
     "selectLanguage": "Select language",
     "close": "Close"
+  },
+  "flasher": {
+    "devicePanel": {
+      "title": "Devices",
+      "noDevices": "No ZMK devices found",
+      "refresh": "Refresh",
+      "select": "Select a device"
+    },
+    "repositoryPanel": {
+      "title": "Firmware Source",
+      "addRepo": "Add Repository",
+      "noRepos": "No repositories added",
+      "select": "Select a repository"
+    },
+    "firmwarePanel": {
+      "title": "Firmware Selection",
+      "noFirmware": "No firmware available",
+      "selectWorkflow": "Select workflow",
+      "noWorkflows": "No workflows found",
+      "selectFirmware": "Select firmware",
+      "compatibility": {
+        "compatible": "Compatible with selected device",
+        "incompatible": "Incompatible with selected device",
+        "unknown": "Compatibility unknown"
+      }
+    },
+    "bottomBar": {
+      "ready": "Ready to flash",
+      "selectDevice": "Select a device",
+      "selectRepo": "Select a repository",
+      "selectFirmware": "Select firmware",
+      "incompatible": "Selected firmware is incompatible with device",
+      "flash": "Flash"
+    },
+    "dialog": {
+      "repository": {
+        "title": "Add Repository",
+        "url": "Repository URL",
+        "pat": "Personal Access Token (optional)",
+        "savePat": "Save token",
+        "add": "Add",
+        "cancel": "Cancel"
+      },
+      "progress": {
+        "title": "Flashing Firmware",
+        "preparing": "Preparing to flash...",
+        "flashing": "Flashing firmware...",
+        "verifying": "Verifying firmware...",
+        "success": "Firmware successfully flashed!",
+        "error": "Flash failed",
+        "close": "Close",
+        "retry": "Retry"
+      }
+    },
+    "toast": {
+      "repoAdded": "Repository {owner}/{repo} added",
+      "repoRemoved": "Repository {owner}/{repo} removed",
+      "noDevices": "No ZMK keyboards found",
+      "checkBootloader": "Make sure your keyboard is connected in bootloader mode",
+      "devicesFound": "{count} ZMK keyboards detected",
+      "workflowSelected": "Workflow '{name}' selected",
+      "newFirmware": "{count} new firmware files retrieved",
+      "noNewFirmware": "No new firmware available",
+      "flashSuccess": "Successfully flashed {firmware} to {device}",
+      "flashComplete": "Flash completed successfully",
+      "flashFailed": "Failed to flash firmware",
+      "error": "Unknown error occurred"
+    }
+  },
+  "keymapEditor": {
+    "openInBrowser": "Open Keymap Editor in browser"
   }
 }

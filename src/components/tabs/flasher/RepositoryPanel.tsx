@@ -12,6 +12,7 @@ import {
 import { PlusCircle, Trash } from 'lucide-react'
 import { getRepoDisplayName } from '@/lib/repoUtils'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useTranslation } from 'react-i18next'
 
 // RepositoryPanel Component
 export interface RepositoryPanelProps {
@@ -31,6 +32,8 @@ export function RepositoryPanel({
   removeRepository,
   onRepositorySelected,
 }: RepositoryPanelProps) {
+  const { t } = useTranslation()
+
   // リポジトリを選択したときの処理
   const handleRepoSelect = (url: string) => {
     setSelectedRepo(url)
@@ -40,7 +43,9 @@ export function RepositoryPanel({
   return (
     <div className="h-full flex flex-col">
       <div className="p-4 border-b">
-        <h3 className="font-semibold">② ファームウェアソース</h3>
+        <h3 className="font-semibold">
+          ② {t('flasher.repositoryPanel.title')}
+        </h3>
       </div>
 
       <ScrollArea className="flex-1 h-full">
@@ -53,7 +58,9 @@ export function RepositoryPanel({
                   onValueChange={handleRepoSelect}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="リポジトリを選択..." />
+                    <SelectValue
+                      placeholder={t('flasher.repositoryPanel.select')}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {repositories.map((repo) => (
@@ -71,9 +78,11 @@ export function RepositoryPanel({
                     className="gap-2 self-end"
                     onClick={() => {
                       const displayName = getRepoDisplayName(selectedRepo)
-                      toast.custom((t) => (
+                      toast.custom((toastId) => (
                         <div className="p-4 bg-card border rounded-lg shadow-lg">
-                          <h3 className="font-medium mb-2">リポジトリの削除</h3>
+                          <h3 className="font-medium mb-2">
+                            {t('flasher.dialog.repository.title')}
+                          </h3>
                           <p className="text-sm mb-4">
                             {displayName} を削除しますか？
                           </p>
@@ -81,19 +90,19 @@ export function RepositoryPanel({
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => toast.dismiss(t)}
+                              onClick={() => toast.dismiss(toastId)}
                             >
-                              キャンセル
+                              {t('flasher.dialog.repository.cancel')}
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => {
                                 removeRepository(selectedRepo)
-                                toast.dismiss(t)
+                                toast.dismiss(toastId)
                               }}
                             >
-                              削除
+                              {t('flasher.dialog.repository.add')}
                             </Button>
                           </div>
                         </div>
@@ -101,14 +110,14 @@ export function RepositoryPanel({
                     }}
                   >
                     <Trash className="h-4 w-4" />
-                    リポジトリ削除
+                    {t('flasher.repositoryPanel.addRepo')}
                   </Button>
                 )}
               </>
             ) : (
               <Alert>
                 <AlertDescription>
-                  リポジトリが登録されていません。追加ボタンからリポジトリを登録してください。
+                  {t('flasher.repositoryPanel.noRepos')}
                 </AlertDescription>
               </Alert>
             )}
@@ -119,7 +128,7 @@ export function RepositoryPanel({
               className="gap-2"
             >
               <PlusCircle className="h-4 w-4" />
-              リポジトリ追加
+              {t('flasher.repositoryPanel.addRepo')}
             </Button>
           </div>
         </div>
