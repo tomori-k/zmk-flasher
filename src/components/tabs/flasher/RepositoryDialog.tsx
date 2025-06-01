@@ -43,10 +43,7 @@ export default function RepositoryDialog({
         <DialogHeader>
           <DialogTitle>{t('flasher.dialog.repository.title')}</DialogTitle>
           <DialogDescription>
-            {t(
-              'flasher.dialog.repository.description',
-              'GitHubリポジトリのURLとアクセストークンを入力してください。'
-            )}
+            {t('flasher.dialog.repository.description')}
           </DialogDescription>
         </DialogHeader>
 

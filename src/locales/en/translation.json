@@ -28,6 +28,15 @@
       "selectWorkflow": "Select workflow",
       "noWorkflows": "No workflows found",
       "selectFirmware": "Select firmware",
+      "refresh": "Get latest firmware",
+      "details": "Details / Compatibility Check",
+      "size": "Size",
+      "buildDate": "Build Date",
+      "commitMessage": "Commit Message",
+      "compatibilityCheck": "Compatibility Check",
+      "none": "None",
+      "downloadArtifact": "Download Artifact",
+      "selectDeviceAndRepo": "Select a device and repository to view firmware",
       "compatibility": {
         "compatible": "Compatible with selected device",
         "incompatible": "Incompatible with selected device",
@@ -35,16 +44,19 @@
       }
     },
     "bottomBar": {
+      "title": "Flash Operation",
       "ready": "Ready to flash",
       "selectDevice": "Select a device",
       "selectRepo": "Select a repository",
       "selectFirmware": "Select firmware",
       "incompatible": "Selected firmware is incompatible with device",
-      "flash": "Flash"
+      "flash": "Flash",
+      "success": "Flash successful"
     },
     "dialog": {
       "repository": {
         "title": "Add Repository",
+        "description": "Enter the GitHub repository URL and access token",
         "url": "Repository URL",
         "pat": "Personal Access Token (optional)",
         "savePat": "Save token",
@@ -63,15 +75,15 @@
       }
     },
     "toast": {
-      "repoAdded": "Repository {owner}/{repo} added",
-      "repoRemoved": "Repository {owner}/{repo} removed",
+      "repoAdded": "Repository {{owner}}/{{repo}} added",
+      "repoRemoved": "Repository {{owner}}/{{repo}} removed",
       "noDevices": "No ZMK keyboards found",
       "checkBootloader": "Make sure your keyboard is connected in bootloader mode",
-      "devicesFound": "{count} ZMK keyboards detected",
-      "workflowSelected": "Workflow '{name}' selected",
-      "newFirmware": "{count} new firmware files retrieved",
+      "devicesFound": "{{count}} ZMK keyboards detected",
+      "workflowSelected": "Workflow '{{name}}' selected",
+      "newFirmware": "{{count}} new firmware files retrieved",
       "noNewFirmware": "No new firmware available",
-      "flashSuccess": "Successfully flashed {firmware} to {device}",
+      "flashSuccess": "Successfully flashed {{firmware}} to {{device}}",
       "flashComplete": "Flash completed successfully",
       "flashFailed": "Failed to flash firmware",
       "error": "Unknown error occurred"

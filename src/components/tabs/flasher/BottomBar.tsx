@@ -27,12 +27,12 @@ export function BottomBar({
     <div className="border-t bg-muted/40 p-2 flex items-center justify-between">
       <div className="flex items-center gap-2 px-2">
         <h3 className="text-sm font-medium">
-          ⑤ {t('flasher.bottomBar.title', '書き込み操作')}
+          ⑤ {t('flasher.bottomBar.title')}
         </h3>
         {flashProgress.status === 'success' && (
           <span className="text-sm text-green-600 flex items-center gap-1">
             <CheckCircle2 className="h-3 w-3" />{' '}
-            {t('flasher.bottomBar.success', '書き込み成功')}
+            {t('flasher.bottomBar.success')}
           </span>
         )}
       </div>
