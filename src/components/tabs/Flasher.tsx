@@ -18,8 +18,11 @@ import { extractRepoInfo } from '@/lib/repoUtils'
 import { apiClient } from '@/services/apiClientFactory'
 import { useLifetimeAbort } from '@/hooks/use-lifetime-abort'
 import { invoke } from '@tauri-apps/api/core'
+import { useTranslation } from 'react-i18next'
 
 export default function Flasher() {
+  const { t } = useTranslation()
+
   // リポジトリストアからデータとアクションを取得
   const {
     repositories,
@@ -110,17 +113,18 @@ export default function Flasher() {
 
       // デバイスが見つからない場合は通知
       if (zmkDevices.length === 0) {
-        toast.info('ZMKキーボードが見つかりませんでした', {
-          description:
-            'キーボードがブートローダーモードで接続されていることを確認してください',
+        toast.info(t('flasher.toast.noDevices'), {
+          description: t('flasher.toast.checkBootloader'),
         })
       } else {
-        toast.success(`${zmkDevices.length}台のZMKキーボードを検出しました`)
+        toast.success(
+          t('flasher.toast.devicesFound', { count: zmkDevices.length })
+        )
       }
     } catch (error) {
       toast.error('デバイス検出エラー', {
         description:
-          error instanceof Error ? error.message : '不明なエラーが発生しました',
+          error instanceof Error ? error.message : t('flasher.toast.error'),
       })
     } finally {
       setIsLoadingDevices(false)
@@ -263,7 +267,7 @@ export default function Flasher() {
       bytesWritten: 0,
       totalBytes: selectedFirmware.size,
       status: 'flashing',
-      message: 'Preparing to flash...',
+      message: t('flasher.dialog.progress.preparing'),
     })
 
     try {
@@ -276,7 +280,9 @@ export default function Flasher() {
           totalBytes: selectedFirmware.size,
           status: 'flashing',
           message:
-            i < 100 ? `Flashing firmware... ${i}%` : 'Verifying firmware...',
+            i < 100
+              ? `${t('flasher.dialog.progress.flashing')} ${i}%`
+              : t('flasher.dialog.progress.verifying'),
         })
       }
 
@@ -287,14 +293,17 @@ export default function Flasher() {
         bytesWritten: selectedFirmware.size,
         totalBytes: selectedFirmware.size,
         status: 'success',
-        message: 'Firmware successfully flashed!',
+        message: t('flasher.dialog.progress.success'),
       })
 
       // 成功トーストを表示
       toast.success(
-        `${selectedFirmware.name} を ${selectedDevice.name} に書き込みました`,
+        t('flasher.toast.flashSuccess', {
+          firmware: selectedFirmware.name,
+          device: selectedDevice.name,
+        }),
         {
-          description: '書き込みが正常に完了しました',
+          description: t('flasher.toast.flashComplete'),
           duration: 5000,
         }
       )
@@ -303,15 +312,15 @@ export default function Flasher() {
       setFlashProgress({
         percentage: 0,
         status: 'error',
-        message: `Flash failed: ${
-          error instanceof Error ? error.message : 'Unknown error'
+        message: `${t('flasher.dialog.progress.error')}: ${
+          error instanceof Error ? error.message : t('flasher.toast.error')
         }`,
       })
 
       // エラートーストを表示
-      toast.error('ファームウェアの書き込みに失敗しました', {
+      toast.error(t('flasher.toast.flashFailed'), {
         description:
-          error instanceof Error ? error.message : '不明なエラーが発生しました',
+          error instanceof Error ? error.message : t('flasher.toast.error'),
         duration: 8000,
       })
     }
@@ -337,7 +346,9 @@ export default function Flasher() {
         const repoInfo = extractRepoInfo(selectedRepositoryUrl || '')
         if (repoInfo) {
           toast.success(
-            `ワークフロー「${selectedWorkflow.name}」を選択しました`,
+            t('flasher.toast.workflowSelected', {
+              name: selectedWorkflow.name,
+            }),
             {
               duration: 3000,
             }
@@ -434,10 +445,12 @@ export default function Flasher() {
                     // 新しいファームウェアが追加されたことを通知
                     if (newFirmwares.length > 0) {
                       toast.success(
-                        `${newFirmwares.length}個の新しいファームウェアを取得しました`
+                        t('flasher.toast.newFirmware', {
+                          count: newFirmwares.length,
+                        })
                       )
                     } else {
-                      toast.info('新しいファームウェアはありませんでした')
+                      toast.info(t('flasher.toast.noNewFirmware'))
                     }
                   }}
                   setSelectedWorkflowId={handleWorkflowSelect}

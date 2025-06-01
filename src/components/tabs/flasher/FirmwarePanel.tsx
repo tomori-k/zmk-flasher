@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import { useLifetimeAbort } from '@/hooks/use-lifetime-abort'
 import { apiClient } from '@/services/apiClientFactory'
 import { useRepositoriesStore } from '@/stores/repositories'
+import { useTranslation } from 'react-i18next'
 
 // FirmwarePanel Component
 export interface FirmwarePanelProps {
@@ -75,32 +76,32 @@ const fetchLatestFirmware = async (
   const firmwares: Firmware[] = []
 
   for (const run of workflowRuns) {
-      const artifacts = await apiClient.fetchWorkflowRunsArtifacts(
-        repository,
-        run.id,
-        signal
-      )
+    const artifacts = await apiClient.fetchWorkflowRunsArtifacts(
+      repository,
+      run.id,
+      signal
+    )
 
-      if (artifacts.length > 0) {
-        // コミットメッセージを取得
-        const commitMessage = run.head_commit?.message || 'コミットメッセージなし'
+    if (artifacts.length > 0) {
+      // コミットメッセージを取得
+      const commitMessage = run.head_commit?.message || 'コミットメッセージなし'
 
-        // このランのartifactsをFirmwareオブジェクトに変換
-        const runFirmwares = artifacts.map((artifact: any) => ({
-          id: `github-artifact-${artifact.id}`,
-          name: artifact.name,
-          path: artifact.archive_download_url,
-          buildDate: artifact.created_at,
-          branch: run.head_branch || 'unknown',
-          commitMessage,
-          size: artifact.size_in_bytes,
-          // Note: boardIdとfamilyIdはartifact名から推測するか、
-          // メタデータが利用可能であれば追加する必要があります
-        }))
+      // このランのartifactsをFirmwareオブジェクトに変換
+      const runFirmwares = artifacts.map((artifact: any) => ({
+        id: `github-artifact-${artifact.id}`,
+        name: artifact.name,
+        path: artifact.archive_download_url,
+        buildDate: artifact.created_at,
+        branch: run.head_branch || 'unknown',
+        commitMessage,
+        size: artifact.size_in_bytes,
+        // Note: boardIdとfamilyIdはartifact名から推測するか、
+        // メタデータが利用可能であれば追加する必要があります
+      }))
 
-        // 結果配列に追加
-        firmwares.push(...runFirmwares)
-      }
+      // 結果配列に追加
+      firmwares.push(...runFirmwares)
+    }
   }
 
   if (firmwares.length === 0) {
@@ -123,6 +124,7 @@ export default function FirmwarePanel({
   workflows,
   isLoadingWorkflows,
 }: FirmwarePanelProps) {
+  const { t } = useTranslation()
   const [isLoadingLatestFirmwares, setIsLoadingLatestFirmwares] =
     useState(false)
 
@@ -139,12 +141,12 @@ export default function FirmwarePanel({
       return
     }
     if (!selectedRepo) {
-      toast.error('リポジトリが選択されていません')
+      toast.error(t('flasher.toast.error'))
       return
     }
 
     if (!selectedWorkflow) {
-      toast.error('ワークフローが選択されていません')
+      toast.error(t('flasher.toast.error'))
       return
     }
 
@@ -165,16 +167,16 @@ export default function FirmwarePanel({
       // 成功メッセージを表示
       if (newFirmwares.length > 0) {
         toast.success(
-          `${newFirmwares.length}個の最新ファームウェアを取得しました`
+          t('flasher.toast.newFirmware', { count: newFirmwares.length })
         )
       } else {
-        toast.info('新しいファームウェアはありませんでした')
+        toast.info(t('flasher.toast.noNewFirmware'))
       }
     } catch (error) {
       // エラーメッセージを表示
-      toast.error('ファームウェアの取得に失敗しました', {
+      toast.error(t('flasher.toast.flashFailed'), {
         description:
-          error instanceof Error ? error.message : '不明なエラーが発生しました',
+          error instanceof Error ? error.message : t('flasher.toast.error'),
         duration: 5000,
       })
     } finally {
@@ -185,7 +187,7 @@ export default function FirmwarePanel({
   return (
     <div className="h-full flex flex-col">
       <div className="p-4 border-b">
-        <h3 className="font-semibold">③ ファームウェア一覧</h3>
+        <h3 className="font-semibold">③ {t('flasher.firmwarePanel.title')}</h3>
       </div>
 
       <ScrollArea className="flex-1 h-full pb-16">
@@ -199,7 +201,9 @@ export default function FirmwarePanel({
               <div className="space-y-4">
                 {/* ワークフロー選択セクションを追加 */}
                 <div className="flex justify-between items-center">
-                  <h4 className="text-sm font-medium">ワークフロー選択</h4>
+                  <h4 className="text-sm font-medium">
+                    {t('flasher.firmwarePanel.selectWorkflow')}
+                  </h4>
                   {isLoadingWorkflows && (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   )}
@@ -214,7 +218,9 @@ export default function FirmwarePanel({
                   disabled={isLoadingWorkflows || workflows.length === 0}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="ワークフローを選択..." />
+                    <SelectValue
+                      placeholder={t('flasher.firmwarePanel.selectWorkflow')}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {workflows.map((workflow) => (
@@ -229,7 +235,9 @@ export default function FirmwarePanel({
                 </Select>
 
                 <div className="flex justify-between items-center">
-                  <h4 className="text-sm font-medium">ファームウェア選択</h4>
+                  <h4 className="text-sm font-medium">
+                    {t('flasher.firmwarePanel.selectFirmware')}
+                  </h4>
                   <Button
                     variant="outline"
                     size="sm"
@@ -241,7 +249,7 @@ export default function FirmwarePanel({
                     ) : (
                       <RefreshCw className="h-4 w-4 mr-2" />
                     )}
-                    最新のファームウェアを取得
+                    {t('flasher.firmwarePanel.refresh')}
                   </Button>
                 </div>
 
@@ -255,7 +263,11 @@ export default function FirmwarePanel({
                       }}
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="ファームウェアを選択..." />
+                        <SelectValue
+                          placeholder={t(
+                            'flasher.firmwarePanel.selectFirmware'
+                          )}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {firmwares.map((firmware) => (
@@ -275,29 +287,37 @@ export default function FirmwarePanel({
 
                     {selectedFirmware && (
                       <div className="mt-6 space-y-4">
-                        <h4 className="font-medium">④ 詳細／互換チェック</h4>
+                        <h4 className="font-medium">
+                          ④ {t('flasher.firmwarePanel.details')}
+                        </h4>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <p className="text-sm text-muted-foreground">
                               BoardID
                             </p>
-                            <p>{selectedFirmware.boardId || 'なし'}</p>
+                            <p>
+                              {selectedFirmware.boardId ||
+                                t('flasher.firmwarePanel.none')}
+                            </p>
                           </div>
                           <div>
                             <p className="text-sm text-muted-foreground">
                               FamilyID
                             </p>
-                            <p>{selectedFirmware.familyId || 'なし'}</p>
+                            <p>
+                              {selectedFirmware.familyId ||
+                                t('flasher.firmwarePanel.none')}
+                            </p>
                           </div>
                           <div>
                             <p className="text-sm text-muted-foreground">
-                              サイズ
+                              {t('flasher.firmwarePanel.size')}
                             </p>
                             <p>{Math.round(selectedFirmware.size / 1024)} KB</p>
                           </div>
                           <div>
                             <p className="text-sm text-muted-foreground">
-                              ビルド日時
+                              {t('flasher.firmwarePanel.buildDate')}
                             </p>
                             <p>
                               {new Date(
@@ -308,7 +328,7 @@ export default function FirmwarePanel({
                           {selectedFirmware.commitMessage && (
                             <div className="col-span-2">
                               <p className="text-sm text-muted-foreground">
-                                コミットメッセージ
+                                {t('flasher.firmwarePanel.commitMessage')}
                               </p>
                               <p className="break-words">
                                 {selectedFirmware.commitMessage}
@@ -324,17 +344,31 @@ export default function FirmwarePanel({
                             {isCompatible ? (
                               <>
                                 <CheckCircle2 className="h-4 w-4" />
-                                <AlertTitle>互換性チェック: OK</AlertTitle>
+                                <AlertTitle>
+                                  {t(
+                                    'flasher.firmwarePanel.compatibilityCheck'
+                                  )}
+                                  : OK
+                                </AlertTitle>
                                 <AlertDescription>
-                                  選択したファームウェアはこのデバイスと互換性があります。
+                                  {t(
+                                    'flasher.firmwarePanel.compatibility.compatible'
+                                  )}
                                 </AlertDescription>
                               </>
                             ) : (
                               <>
                                 <AlertTriangle className="h-4 w-4" />
-                                <AlertTitle>互換性チェック: NG</AlertTitle>
+                                <AlertTitle>
+                                  {t(
+                                    'flasher.firmwarePanel.compatibilityCheck'
+                                  )}
+                                  : NG
+                                </AlertTitle>
                                 <AlertDescription>
-                                  選択したファームウェアはこのデバイスと互換性がありません。別のファームウェアを選択してください。
+                                  {t(
+                                    'flasher.firmwarePanel.compatibility.incompatible'
+                                  )}
                                 </AlertDescription>
                               </>
                             )}
@@ -350,7 +384,7 @@ export default function FirmwarePanel({
                               }
                             >
                               <Download className="h-4 w-4 mr-2" />
-                              アーティファクトをダウンロード
+                              {t('flasher.firmwarePanel.downloadArtifact')}
                             </Button>
                           )}
                       </div>
@@ -359,7 +393,7 @@ export default function FirmwarePanel({
                 ) : (
                   <Alert>
                     <AlertDescription>
-                      該当するファームウェアが見つかりません。「最新のファームウェアを取得」ボタンをクリックするか、別のデバイスまたはリポジトリを選択してください。
+                      {t('flasher.firmwarePanel.noFirmware')}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -368,7 +402,7 @@ export default function FirmwarePanel({
           ) : (
             <Alert>
               <AlertDescription>
-                デバイスとリポジトリを選択するとファームウェア一覧が表示されます。
+                {t('flasher.firmwarePanel.selectDeviceAndRepo')}
               </AlertDescription>
             </Alert>
           )}

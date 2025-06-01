@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { useEffect, useRef } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
+import { useTranslation } from 'react-i18next'
 
 // DevicePanel Component
 export interface DevicePanelProps {
@@ -109,11 +110,13 @@ export default function DevicePanel({
       unlisten()
     }
   }, [])
+  const { t } = useTranslation()
+
   return (
     <div className="h-full flex flex-col border-r">
       <div className="p-4 border-b flex justify-between items-center">
         <h3 className="font-semibold flex items-center gap-2">
-          <Keyboard className="h-4 w-4" />① 接続キーボード
+          <Keyboard className="h-4 w-4" />① {t('flasher.devicePanel.title')}
         </h3>
         <Button
           variant="outline"
@@ -176,9 +179,9 @@ export default function DevicePanel({
         ) : (
           <Alert>
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>デバイスが見つかりません</AlertTitle>
+            <AlertTitle>{t('flasher.devicePanel.noDevices')}</AlertTitle>
             <AlertDescription>
-              ZMKキーボードがブートローダーモードで接続されていることを確認してください。
+              {t('flasher.toast.checkBootloader')}
               <div className="mt-2">
                 <Button
                   variant="outline"
@@ -186,7 +189,7 @@ export default function DevicePanel({
                   onClick={onRefreshDevice}
                   className="w-full"
                 >
-                  デバイスを再検索
+                  {t('flasher.devicePanel.refresh')}
                 </Button>
               </div>
             </AlertDescription>

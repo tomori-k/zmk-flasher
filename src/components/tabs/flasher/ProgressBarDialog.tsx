@@ -4,6 +4,7 @@ import { DialogHeader, DialogFooter } from '@/components/ui/dialog'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
 import { FlashProgress } from './types'
+import { useTranslation } from 'react-i18next'
 
 // ProgressDialog Component
 export interface ProgressDialogProps {
@@ -19,18 +20,20 @@ export default function ProgressDialog({
   progress,
   retryFlash,
 }: ProgressDialogProps) {
+  const { t } = useTranslation()
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
             {progress.status === 'flashing'
-              ? 'ファームウェア書き込み中...'
+              ? t('flasher.dialog.progress.flashing')
               : progress.status === 'success'
-              ? '書き込み成功'
+              ? t('flasher.dialog.progress.success')
               : progress.status === 'error'
-              ? '書き込み失敗'
-              : 'ファームウェア書き込み'}
+              ? t('flasher.dialog.progress.error')
+              : t('flasher.dialog.progress.title')}
           </DialogTitle>
         </DialogHeader>
 
@@ -55,13 +58,17 @@ export default function ProgressDialog({
 
         <DialogFooter>
           {progress.status === 'success' ? (
-            <Button onClick={() => setOpen(false)}>完了</Button>
+            <Button onClick={() => setOpen(false)}>
+              {t('flasher.dialog.progress.close')}
+            </Button>
           ) : progress.status === 'error' ? (
             <>
               <Button variant="outline" onClick={() => setOpen(false)}>
-                閉じる
+                {t('flasher.dialog.progress.close')}
               </Button>
-              <Button onClick={retryFlash}>リトライ</Button>
+              <Button onClick={retryFlash}>
+                {t('flasher.dialog.progress.retry')}
+              </Button>
             </>
           ) : null}
         </DialogFooter>
