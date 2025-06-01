@@ -1,18 +1,14 @@
-import { useState, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { useEffect } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Toaster } from '@/components/ui/sonner'
 import { useRepositoriesStore } from '@/stores/repositories'
 import Flasher from '@/components/tabs/Flasher'
 import KeymapEditor from '@/components/tabs/KeymapEditor'
+import { useTranslation } from 'react-i18next'
+import { SettingsDialog } from '@/components/settings/SettingsDialog'
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState('')
-  const [name, setName] = useState('')
-
-  async function greet() {
-    setGreetMsg(await invoke('greet', { name }))
-  }
+  const { t } = useTranslation()
 
   // リポジトリストアの初期化
   const initializeRepositories = useRepositoriesStore(
@@ -27,9 +23,16 @@ function App() {
   return (
     <main>
       <Tabs defaultValue="flasher" className="">
-        <TabsList>
-          <TabsTrigger value="flasher">Flash</TabsTrigger>
-          <TabsTrigger value="keymap-editor">Edit Keymaps</TabsTrigger>
+        <TabsList className="w-full">
+          <TabsTrigger className="w-32 flex-none" value="flasher">
+            {t('tabs.flasher')}
+          </TabsTrigger>
+          <TabsTrigger className="w-32 flex-none" value="keymap-editor">
+            {t('tabs.keymapEditor')}
+          </TabsTrigger>
+          <div className="flex-1 flex justify-end">
+            <SettingsDialog />
+          </div>
         </TabsList>
         <TabsContent value="flasher">
           <Flasher />

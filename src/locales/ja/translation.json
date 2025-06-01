@@ -1,0 +1,95 @@
+{
+  "tabs": {
+    "flasher": "書き込み",
+    "keymapEditor": "キーマップ編集"
+  },
+  "settings": {
+    "title": "設定",
+    "language": "言語",
+    "selectLanguage": "言語を選択",
+    "close": "閉じる"
+  },
+  "flasher": {
+    "devicePanel": {
+      "title": "デバイス",
+      "noDevices": "ZMKデバイスが見つかりません",
+      "refresh": "更新",
+      "select": "デバイスを選択"
+    },
+    "repositoryPanel": {
+      "title": "ファームウェアソース",
+      "addRepo": "リポジトリを追加",
+      "noRepos": "リポジトリが追加されていません",
+      "select": "リポジトリを選択"
+    },
+    "firmwarePanel": {
+      "title": "ファームウェア選択",
+      "noFirmware": "利用可能なファームウェアがありません",
+      "selectWorkflow": "ワークフローを選択",
+      "noWorkflows": "ワークフローが見つかりません",
+      "selectFirmware": "ファームウェアを選択",
+      "refresh": "最新のファームウェアを取得",
+      "details": "詳細／互換性チェック",
+      "size": "サイズ",
+      "buildDate": "ビルド日時",
+      "commitMessage": "コミットメッセージ",
+      "compatibilityCheck": "互換性チェック",
+      "none": "なし",
+      "downloadArtifact": "アーティファクトをダウンロード",
+      "selectDeviceAndRepo": "デバイスとリポジトリを選択するとファームウェア一覧が表示されます",
+      "compatibility": {
+        "compatible": "選択したデバイスと互換性があります",
+        "incompatible": "選択したデバイスと互換性がありません",
+        "unknown": "互換性が不明です"
+      }
+    },
+    "bottomBar": {
+      "title": "書き込み操作",
+      "ready": "書き込み準備完了",
+      "selectDevice": "デバイスを選択してください",
+      "selectRepo": "リポジトリを選択してください",
+      "selectFirmware": "ファームウェアを選択してください",
+      "incompatible": "選択したファームウェアはデバイスと互換性がありません",
+      "flash": "書き込む",
+      "success": "書き込み成功"
+    },
+    "dialog": {
+      "repository": {
+        "title": "リポジトリを追加",
+        "description": "GitHubリポジトリのURLとアクセストークンを入力してください",
+        "url": "リポジトリURL",
+        "pat": "個人アクセストークン（オプション）",
+        "savePat": "トークンを保存",
+        "add": "追加",
+        "cancel": "キャンセル"
+      },
+      "progress": {
+        "title": "ファームウェア書き込み",
+        "preparing": "書き込みの準備中...",
+        "flashing": "ファームウェアを書き込み中...",
+        "verifying": "ファームウェアを検証中...",
+        "success": "ファームウェアの書き込みに成功しました！",
+        "error": "書き込みに失敗しました",
+        "close": "閉じる",
+        "retry": "再試行"
+      }
+    },
+    "toast": {
+      "repoAdded": "リポジトリ {{owner}}/{{repo}} を追加しました",
+      "repoRemoved": "リポジトリ {{owner}}/{{repo}} を削除しました",
+      "noDevices": "ZMKキーボードが見つかりませんでした",
+      "checkBootloader": "キーボードがブートローダーモードで接続されていることを確認してください",
+      "devicesFound": "{{count}}台のZMKキーボードを検出しました",
+      "workflowSelected": "ワークフロー「{{name}}」を選択しました",
+      "newFirmware": "{{count}}個の新しいファームウェアを取得しました",
+      "noNewFirmware": "新しいファームウェアはありませんでした",
+      "flashSuccess": "{{firmware}} を {{device}} に書き込みました",
+      "flashComplete": "書き込みが正常に完了しました",
+      "flashFailed": "ファームウェアの書き込みに失敗しました",
+      "error": "不明なエラーが発生しました"
+    }
+  },
+  "keymapEditor": {
+    "openInBrowser": "ブラウザでKeymap Editorを開く"
+  }
+}

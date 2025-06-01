@@ -2,8 +2,16 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Device } from '@/types/types'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Keyboard, Loader2, RefreshCw, AlertTriangle, CheckCircle2, Usb } from 'lucide-react'
+import {
+  Keyboard,
+  Loader2,
+  RefreshCw,
+  AlertTriangle,
+  CheckCircle2,
+  Usb,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { useTranslation } from 'react-i18next'
 
 // DevicePanel Component
 export interface DevicePanelProps {
@@ -21,11 +29,13 @@ export default function DevicePanel({
   isLoadingDevices,
   refreshDevices,
 }: DevicePanelProps) {
+  const { t } = useTranslation()
+
   return (
     <div className="h-full flex flex-col border-r">
       <div className="p-4 border-b flex justify-between items-center">
         <h3 className="font-semibold flex items-center gap-2">
-          <Keyboard className="h-4 w-4" />① 接続キーボード
+          <Keyboard className="h-4 w-4" />① {t('flasher.devicePanel.title')}
         </h3>
         <Button
           variant="outline"
@@ -69,7 +79,7 @@ export default function DevicePanel({
                     ZMK
                   </Badge>
                 </div>
-                
+
                 {device.side && (
                   <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                     <Badge variant="secondary" className="text-xs">
@@ -77,7 +87,7 @@ export default function DevicePanel({
                     </Badge>
                   </div>
                 )}
-                
+
                 <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                   <Usb className="h-3 w-3" />
                   {device.vid}:{device.pid}
@@ -88,17 +98,17 @@ export default function DevicePanel({
         ) : (
           <Alert>
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>デバイスが見つかりません</AlertTitle>
+            <AlertTitle>{t('flasher.devicePanel.noDevices')}</AlertTitle>
             <AlertDescription>
-              ZMKキーボードがブートローダーモードで接続されていることを確認してください。
+              {t('flasher.toast.checkBootloader')}
               <div className="mt-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={refreshDevices}
                   className="w-full"
                 >
-                  デバイスを再検索
+                  {t('flasher.devicePanel.refresh')}
                 </Button>
               </div>
             </AlertDescription>

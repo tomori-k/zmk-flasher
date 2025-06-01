@@ -9,6 +9,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { useTranslation } from 'react-i18next'
 
 // RepositoryDialog Component
 export interface RepositoryDialogProps {
@@ -34,19 +35,23 @@ export default function RepositoryDialog({
   setSavePAT,
   addRepository,
 }: RepositoryDialogProps) {
+  const { t } = useTranslation()
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>リポジトリを追加</DialogTitle>
+          <DialogTitle>{t('flasher.dialog.repository.title')}</DialogTitle>
           <DialogDescription>
-            GitHubリポジトリのURLとアクセストークンを入力してください。
+            {t('flasher.dialog.repository.description')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="repo-url">GitHub リポジトリ URL</Label>
+            <Label htmlFor="repo-url">
+              {t('flasher.dialog.repository.url')}
+            </Label>
             <Input
               id="repo-url"
               placeholder="https://github.com/owner/repo"
@@ -56,7 +61,9 @@ export default function RepositoryDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="repo-pat">Personal Access Token (Optional)</Label>
+            <Label htmlFor="repo-pat">
+              {t('flasher.dialog.repository.pat')}
+            </Label>
             <Input
               id="repo-pat"
               type="password"
@@ -74,7 +81,7 @@ export default function RepositoryDialog({
                 htmlFor="save-pat"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                トークンを保存する
+                {t('flasher.dialog.repository.savePat')}
               </label>
             </div>
           </div>
@@ -82,9 +89,11 @@ export default function RepositoryDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            キャンセル
+            {t('flasher.dialog.repository.cancel')}
           </Button>
-          <Button onClick={addRepository}>追加</Button>
+          <Button onClick={addRepository}>
+            {t('flasher.dialog.repository.add')}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
