@@ -1,0 +1,12 @@
+{
+  "tabs": {
+    "flasher": "Flash",
+    "keymapEditor": "Edit Keymaps"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "selectLanguage": "Select language",
+    "close": "Close"
+  }
+}

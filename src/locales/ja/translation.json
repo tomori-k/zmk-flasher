@@ -1,0 +1,12 @@
+{
+  "tabs": {
+    "flasher": "書き込み",
+    "keymapEditor": "キーマップ編集"
+  },
+  "settings": {
+    "title": "設定",
+    "language": "言語",
+    "selectLanguage": "言語を選択",
+    "close": "閉じる"
+  }
+}
