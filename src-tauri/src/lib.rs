@@ -1,9 +1,21 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use anyhow::Result;
-use rusb::{Context, UsbContext};
+use once_cell::sync::Lazy;
+use rusb::{Context, Device, HotplugBuilder, UsbContext};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tauri::{AppHandle, Emitter};
+
+struct MonitoringState {
+    registration: rusb::Registration<Context>,
+    tx_stop: std::sync::mpsc::Sender<()>,
+}
+
+// ホットプラグ監視の登録情報を保持するグローバル変数
+static MONITORING_STATE: Lazy<Arc<Mutex<Option<MonitoringState>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(None)));
 
 // ZMKキーボード検出のための既知のVID/PIDマッピング
 // これは実際のZMKキーボードの値に合わせて調整する必要があります
@@ -119,6 +131,88 @@ fn get_zmk_devices() -> Result<Vec<UsbDevice>, anyhow::Error> {
     Ok(result)
 }
 
+/// USBデバイスの監視を開始し、変更があった場合にイベントを発行する
+#[tauri::command]
+fn start_usb_monitoring(app_handle: AppHandle) -> Result<(), String> {
+    // ホットプラグがサポートされているか確認
+    if !rusb::has_hotplug() {
+        return Err("このシステムではUSBホットプラグ機能がサポートされていません".to_string());
+    }
+
+    // すでに監視が実行中なら何もしない
+    let mut state_guard = MONITORING_STATE.lock().unwrap();
+    if state_guard.is_some() {
+        return Ok(());
+    }
+
+    // USB監視用のコンテキストを作成
+    let context = match Context::new() {
+        Ok(ctx) => ctx,
+        Err(e) => return Err(format!("USBコンテキスト作成エラー: {}", e)),
+    };
+
+    // ホットプラグハンドラを作成
+    let handler = UsbHotPlugHandler {
+        app_handle: app_handle.clone(),
+    };
+
+    // 最新のHotplugBuilderを使用してホットプラグコールバックを登録
+    let registration = match HotplugBuilder::new()
+        .enumerate(true) // すでに接続されているデバイスも対象にする
+        .register(&context, Box::new(handler))
+    {
+        Ok(reg) => reg,
+        Err(e) => return Err(format!("ホットプラグコールバック登録エラー: {}", e)),
+    };
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    // 登録情報をグローバル変数に保存
+    *state_guard = Some(MonitoringState {
+        registration,
+        tx_stop: tx,
+    });
+
+    // イベント処理スレッドを開始
+    let context_clone = context.clone();
+    tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<()> {
+        loop {
+            context_clone.handle_events(Some(std::time::Duration::from_millis(100)))?;
+            match rx.try_recv() {
+                Ok(_) | Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    // 停止要求があった場合はループを抜ける
+                    break;
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => { /* イベントがない場合は何もしない */
+                }
+            }
+        }
+        Ok(())
+    });
+
+    Ok(())
+}
+
+/// USBデバイスの監視を停止する
+#[tauri::command]
+fn stop_usb_monitoring() -> Result<(), String> {
+    // ホットプラグ監視を解除
+    let mut state_guard = MONITORING_STATE.lock().unwrap();
+    if let Some(state) = state_guard.take() {
+        // 停止要求を送信
+        state
+            .tx_stop
+            .send(())
+            .map_err(|e| format!("USB監視停止要求送信エラー: {}", e))?;
+
+        // コンテキスト取得とコールバック解除
+        if let Ok(context) = Context::new() {
+            let _ = context.unregister_callback(state.registration);
+        }
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -128,7 +222,53 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, detect_zmk_devices])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            detect_zmk_devices,
+            start_usb_monitoring,
+            stop_usb_monitoring
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// ホットプラグ機能用のハンドラ構造体
+struct UsbHotPlugHandler {
+    app_handle: tauri::AppHandle,
+}
+
+impl<T: UsbContext> rusb::Hotplug<T> for UsbHotPlugHandler {
+    fn device_arrived(&mut self, device: Device<T>) {
+        // デバイスの接続を検知
+        if let Ok(device_desc) = device.device_descriptor() {
+            let vid = device_desc.vendor_id();
+            let pid = device_desc.product_id();
+
+            // ZMKデバイスリストに含まれるVID/PIDかチェック
+            if ZMK_DEVICE_MAP.get(&(vid, pid)).is_some() {
+                // デバイスリストを取得してフロントエンドに通知
+                if let Ok(devices) = get_zmk_devices() {
+                    // フロントエンドにUSBデバイス変更イベントを送信
+                    let _ = self.app_handle.emit("usb-device-changed", devices.clone());
+                }
+            }
+        }
+    }
+
+    fn device_left(&mut self, device: Device<T>) {
+        // デバイスの切断を検知
+        if let Ok(device_desc) = device.device_descriptor() {
+            let vid = device_desc.vendor_id();
+            let pid = device_desc.product_id();
+
+            // ZMKデバイスリストに含まれるVID/PIDかチェック
+            if ZMK_DEVICE_MAP.get(&(vid, pid)).is_some() {
+                // デバイスリストを取得してフロントエンドに通知
+                if let Ok(devices) = get_zmk_devices() {
+                    // フロントエンドにUSBデバイス変更イベントを送信
+                    let _ = self.app_handle.emit("usb-device-changed", devices.clone());
+                }
+            }
+        }
+    }
 }

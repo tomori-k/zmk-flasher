@@ -11,6 +11,9 @@ import {
   Usb,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { useEffect, useRef } from 'react'
+import { listen } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
 import { useTranslation } from 'react-i18next'
 
 // DevicePanel Component
@@ -19,16 +22,94 @@ export interface DevicePanelProps {
   selectedDevice: Device | null
   setSelectedDevice: (device: Device | null) => void
   isLoadingDevices: boolean
-  refreshDevices: () => Promise<void>
+  onRefreshDevice: () => void
 }
+
+const usbDevice = (function () {
+  const callbacks: (() => void)[] = []
+
+  type MonitoringState =
+    | 'started'
+    | 'stopped'
+    | 'start-requested'
+    | 'stop-requested'
+
+  let state: MonitoringState = 'stopped'
+
+  async function startUsbMonitoring() {
+    if (state === 'started') return
+    state = 'start-requested'
+    await invoke('start_usb_monitoring')
+    state = 'started'
+  }
+
+  async function stopUsbMonitoring() {
+    if (state === 'stopped') return
+    state = 'stop-requested'
+    await invoke('stop_usb_monitoring')
+    state = 'stopped'
+  }
+
+  if (typeof window !== 'undefined') {
+    async function listenForUsbChanges() {
+      const unlisten = await listen<Device[]>('usb-device-changed', (event) => {
+        console.log('USBデバイスの変更を検知しました:', event.payload)
+        callbacks.forEach((callback) => callback())
+      })
+      return unlisten
+    }
+
+    const unlistenPromise = listenForUsbChanges()
+
+    window.addEventListener('beforeunload', () => {
+      stopUsbMonitoring()
+      unlistenPromise.then((unlisten) => {
+        unlisten()
+      })
+    })
+  }
+
+  return {
+    /**
+     * USBデバイスの変更イベントをリッスンする
+     * @returns {Function} イベントリスナーを解除する関数
+     * */
+    listen(callback: () => void): () => void {
+      callbacks.push(callback)
+      startUsbMonitoring()
+      return () => {
+        const index = callbacks.indexOf(callback)
+        if (index !== -1) {
+          callbacks.splice(index, 1)
+          if (callbacks.length === 0) {
+            stopUsbMonitoring()
+          }
+        }
+      }
+    },
+  }
+})()
 
 export default function DevicePanel({
   devices,
   selectedDevice,
   setSelectedDevice,
   isLoadingDevices,
-  refreshDevices,
+  onRefreshDevice,
 }: DevicePanelProps) {
+  const latestOnRefreshDevice = useRef(onRefreshDevice)
+  latestOnRefreshDevice.current = onRefreshDevice
+
+  // USBデバイス変更イベントを検知するリスナーをセットアップ
+  useEffect(() => {
+    const unlisten = usbDevice.listen(() => {
+      latestOnRefreshDevice.current()
+    })
+
+    return () => {
+      unlisten()
+    }
+  }, [])
   const { t } = useTranslation()
 
   return (
@@ -40,7 +121,7 @@ export default function DevicePanel({
         <Button
           variant="outline"
           size="sm"
-          onClick={refreshDevices}
+          onClick={onRefreshDevice}
           disabled={isLoadingDevices}
         >
           {isLoadingDevices ? (
@@ -105,7 +186,7 @@ export default function DevicePanel({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={refreshDevices}
+                  onClick={onRefreshDevice}
                   className="w-full"
                 >
                   {t('flasher.devicePanel.refresh')}
