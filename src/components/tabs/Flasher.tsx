@@ -104,8 +104,7 @@ export default function Flasher() {
     }
   }
 
-  // Mock functions - replace with actual implementations
-  const refreshDevices = async () => {
+  const handleRefreshDevices = async () => {
     setIsLoadingDevices(true)
     try {
       // Tauriのバックエンドから接続されているZMKデバイスのリストを取得
@@ -127,8 +126,6 @@ export default function Flasher() {
         description:
           error instanceof Error ? error.message : t('flasher.toast.error'),
       })
-      // エラー時は空のリストにする
-      setDevices([])
     } finally {
       setIsLoadingDevices(false)
     }
@@ -370,7 +367,7 @@ export default function Flasher() {
   // 初期化処理
   useEffect(() => {
     // デバイス一覧の取得
-    refreshDevices()
+    handleRefreshDevices()
   }, [])
 
   // リポジトリまたはデバイスが変更されたらファームウェア一覧を更新
@@ -399,7 +396,7 @@ export default function Flasher() {
               selectedDevice={selectedDevice}
               setSelectedDevice={setSelectedDevice}
               isLoadingDevices={isLoadingDevices}
-              refreshDevices={refreshDevices}
+              onRefreshDevice={handleRefreshDevices}
             />
           </ResizablePanel>
 
