@@ -14,7 +14,9 @@
       "title": "Devices",
       "noDevices": "No ZMK devices found",
       "refresh": "Refresh",
-      "select": "Select a device"
+      "select": "Select a device",
+      "bootloaderMode": "Bootloader Mode",
+      "makeItBootloaderMode": "To flash firmware, put your device in bootloader mode"
     },
     "repositoryPanel": {
       "title": "Firmware Source",
@@ -78,7 +80,7 @@
       "repoAdded": "Repository {{owner}}/{{repo}} added",
       "repoRemoved": "Repository {{owner}}/{{repo}} removed",
       "noDevices": "No ZMK keyboards found",
-      "checkBootloader": "Make sure your keyboard is connected in bootloader mode",
+      "checkConnection": "Make sure your keyboard is connected",
       "devicesFound": "{{count}} ZMK keyboards detected",
       "workflowSelected": "Workflow '{{name}}' selected",
       "newFirmware": "{{count}} new firmware files retrieved",

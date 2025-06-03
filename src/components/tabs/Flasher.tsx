@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/resizable'
 import { Device, Firmware, Repository } from '@/types/types'
 import { useRepositoriesStore } from '@/stores/repositories'
-import DevicePanel from './flasher/DevicePanel'
+import DevicePanel, { DeviceWithBootloader } from './flasher/DevicePanel'
 import FirmwarePanel from './flasher/FirmwarePanel'
 import { RepositoryPanel } from './flasher/RepositoryPanel'
 import { BottomBar } from './flasher/BottomBar'
@@ -19,6 +19,21 @@ import { apiClient } from '@/services/apiClientFactory'
 import { useLifetimeAbort } from '@/hooks/use-lifetime-abort'
 import { invoke } from '@tauri-apps/api/core'
 import { useTranslation } from 'react-i18next'
+
+// マイコンのブートローダーモードのVID/PID
+const MCU_BOOTLOADER_DEVICES = [
+  // { vid: '0x1D50', pid: '0x615E' }, // ZMK Project MCU Bootloader - これはキーボードとして認識する
+  { vid: '0x2886', pid: '0x0045' }, // Seeed Studio XIAO nRF52840 Bootloader
+]
+
+// デバイスがマイコンのブートローダーモードかどうかを判定する関数
+const isBootloaderMode = (device: Device): boolean => {
+  return MCU_BOOTLOADER_DEVICES.some(
+    (bootloader) =>
+      bootloader.vid.toLowerCase() === device.vid.toLowerCase() &&
+      bootloader.pid.toLowerCase() === device.pid.toLowerCase()
+  )
+}
 
 export default function Flasher() {
   const { t } = useTranslation()
@@ -40,7 +55,7 @@ export default function Flasher() {
   } = useRepositoriesStore()
 
   // State
-  const [devices, setDevices] = useState<Device[]>([])
+  const [devices, setDevices] = useState<DeviceWithBootloader[]>([])
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [isLoadingDevices, setIsLoadingDevices] = useState(false)
 
@@ -109,12 +124,19 @@ export default function Flasher() {
     try {
       // Tauriのバックエンドから接続されているZMKデバイスのリストを取得
       const zmkDevices = await invoke<Device[]>('detect_zmk_devices')
-      setDevices(zmkDevices)
+
+      // デバイスごとにブートローダーモードかどうかをチェック
+      const devicesWithBootloaderFlag = zmkDevices.map((device) => ({
+        ...device,
+        isBootloader: isBootloaderMode(device),
+      }))
+
+      setDevices(devicesWithBootloaderFlag)
 
       // デバイスが見つからない場合は通知
       if (zmkDevices.length === 0) {
         toast.info(t('flasher.toast.noDevices'), {
-          description: t('flasher.toast.checkBootloader'),
+          description: t('flasher.toast.checkConnection'),
         })
       } else {
         toast.success(

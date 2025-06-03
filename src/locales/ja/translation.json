@@ -14,7 +14,9 @@
       "title": "デバイス",
       "noDevices": "ZMKデバイスが見つかりません",
       "refresh": "更新",
-      "select": "デバイスを選択"
+      "select": "デバイスを選択",
+      "bootloaderMode": "ブートローダーモード",
+      "makeItBootloaderMode": "ファームウェアを書き込むには、デバイスをブートローダーモードにしてください"
     },
     "repositoryPanel": {
       "title": "ファームウェアソース",
@@ -78,7 +80,7 @@
       "repoAdded": "リポジトリ {{owner}}/{{repo}} を追加しました",
       "repoRemoved": "リポジトリ {{owner}}/{{repo}} を削除しました",
       "noDevices": "ZMKキーボードが見つかりませんでした",
-      "checkBootloader": "キーボードがブートローダーモードで接続されていることを確認してください",
+      "checkConnection": "キーボードが接続されていることを確認してください",
       "devicesFound": "{{count}}台のZMKキーボードを検出しました",
       "workflowSelected": "ワークフロー「{{name}}」を選択しました",
       "newFirmware": "{{count}}個の新しいファームウェアを取得しました",
