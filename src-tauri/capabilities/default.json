@@ -5,6 +5,11 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "opener:default"
+    "opener:default",
+    "fs:allow-appdata-read",
+    "fs:allow-temp-read",
+    "fs:allow-appdata-write",
+    "fs:allow-temp-write",
+    "core:window:allow-destroy"
   ]
 }

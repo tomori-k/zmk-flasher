@@ -3,13 +3,15 @@ import { Repository, Workflow } from '@/types/types'
 import { isValidGithubUrl } from '@/lib/repoUtils'
 
 // リポジトリストアの状態定義
-interface RepositoriesState {
+type RepositoriesState = {
   // データ
   repositories: Repository[]
   selectedRepositoryUrl: string | null
   workflows: Workflow[]
   isLoadingWorkflows: boolean
+}
 
+type RepositoriesAction = {
   // アクション
   setRepositories: (repositories: Repository[]) => void
   setSelectedRepositoryUrl: (url: string | null) => void
@@ -25,20 +27,12 @@ interface RepositoriesState {
   // ユーティリティ関数
   getSelectedRepository: () => Repository | null
   getSelectedWorkflow: () => Workflow | null
-
-  // 初期化
-  initialize: () => void
 }
 
-// サンプルリポジトリデータ
-const SAMPLE_REPOSITORIES: Repository[] = [
-  {
-    url: 'https://github.com/zmkfirmware/zmk',
-  },
-]
-
 // リポジトリストアの作成
-export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
+export const useRepositoriesStore = create<
+  RepositoriesState & RepositoriesAction
+>((set, get) => ({
   // 初期状態
   repositories: [],
   selectedRepositoryUrl: null,
@@ -147,14 +141,5 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
 
     // 保存されたワークフローIDがないか、見つからない場合は最初のものを返す
     return null
-  },
-
-  // 初期化関数
-  initialize: () => {
-    set({
-      repositories: SAMPLE_REPOSITORIES,
-      selectedRepositoryUrl:
-        SAMPLE_REPOSITORIES.length > 0 ? SAMPLE_REPOSITORIES[0].url : null,
-    })
   },
 }))
