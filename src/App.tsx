@@ -1,7 +1,5 @@
-import { useEffect } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Toaster } from '@/components/ui/sonner'
-import { useRepositoriesStore } from '@/stores/repositories'
 import Flasher from '@/components/tabs/Flasher'
 import KeymapEditor from '@/components/tabs/KeymapEditor'
 import { useTranslation } from 'react-i18next'
@@ -9,16 +7,6 @@ import { SettingsDialog } from '@/components/settings/SettingsDialog'
 
 function App() {
   const { t } = useTranslation()
-
-  // リポジトリストアの初期化
-  const initializeRepositories = useRepositoriesStore(
-    (state) => state.initialize
-  )
-
-  useEffect(() => {
-    // アプリ起動時にリポジトリストアを初期化
-    initializeRepositories()
-  }, [])
 
   return (
     <main>
