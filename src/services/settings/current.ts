@@ -14,6 +14,8 @@ export type AnySettings = SettingsV20250602 | SettingsV20250603
 // The current settings type is the latest version
 export type Settings = SettingsV20250603
 
+export type SettingsWithoutVersion = Omit<Settings, 'version'>
+
 // Export the latest version code
 export const LATEST_VERSION = V20250603_VERSION
 
@@ -80,7 +82,7 @@ export function migrate(settings: AnySettings): Settings {
  * @returns Current settings or default settings if none exist
  * @throws Error if settings cannot be loaded or migrated
  */
-export async function loadSettings(): Promise<Settings> {
+export async function loadSettings(): Promise<SettingsWithoutVersion> {
   try {
     // Read the settings file
     const settings = await readSettingsFile()
@@ -106,6 +108,8 @@ export async function loadSettings(): Promise<Settings> {
  * @param settings Settings to save
  * @throws Error if settings cannot be saved
  */
-export async function saveSettings(settings: Settings): Promise<void> {
-  await writeSettingsFile(settings)
+export async function saveSettings(
+  settings: SettingsWithoutVersion
+): Promise<void> {
+  await writeSettingsFile({ ...settings, version: LATEST_VERSION })
 }
