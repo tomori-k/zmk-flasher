@@ -9,16 +9,27 @@ import {
   AlertTriangle,
   CheckCircle2,
   Usb,
+  KeyboardIcon,
+  Cpu,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useEffect, useRef } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { useTranslation } from 'react-i18next'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+
+export type DeviceWithBootloader = Device & {
+  isBootloader: boolean
+}
 
 // DevicePanel Component
 export interface DevicePanelProps {
-  devices: Device[]
+  devices: DeviceWithBootloader[]
   selectedDevice: Device | null
   setSelectedDevice: (device: Device | null) => void
   isLoadingDevices: boolean
@@ -142,37 +153,51 @@ export default function DevicePanel({
             {devices.map((device) => (
               <div
                 key={device.id}
-                className={`p-3 rounded-md cursor-pointer border ${
+                className={`p-3 rounded-md cursor-pointer border flex items-center justify-between ${
                   selectedDevice?.id === device.id
                     ? 'bg-primary/10 border-primary'
                     : 'hover:bg-muted border-transparent'
                 }`}
                 onClick={() => setSelectedDevice(device)}
               >
-                <div className="flex items-center justify-between">
-                  <div className="font-medium flex items-center gap-2">
-                    {device.name}
-                    {selectedDevice?.id === device.id && (
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                    )}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium flex items-center gap-2">
+                      {device.name}
+                      {selectedDevice?.id === device.id && (
+                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                      )}
+                    </div>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    ZMK
-                  </Badge>
+
+                  {device.side && (
+                    <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                      <Badge variant="secondary" className="text-xs">
+                        {device.side === 'left' ? '左側' : '右側'}
+                      </Badge>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <Usb className="h-3 w-3" />
+                    {device.vid}:{device.pid}
+                  </div>
                 </div>
 
-                {device.side && (
-                  <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                    <Badge variant="secondary" className="text-xs">
-                      {device.side === 'left' ? '左側' : '右側'}
-                    </Badge>
-                  </div>
-                )}
-
-                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <Usb className="h-3 w-3" />
-                  {device.vid}:{device.pid}
-                </div>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <div className="w-7 h-7 p-1 flex items-center justify-center text-primary">
+                      {device.isBootloader ? <Cpu /> : <KeyboardIcon />}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      {device.isBootloader
+                        ? t('flasher.devicePanel.bootloaderMode')
+                        : t('flasher.devicePanel.makeItBootloaderMode')}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             ))}
           </div>
@@ -181,7 +206,7 @@ export default function DevicePanel({
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>{t('flasher.devicePanel.noDevices')}</AlertTitle>
             <AlertDescription>
-              {t('flasher.toast.checkBootloader')}
+              {t('flasher.toast.checkConnection')}
               <div className="mt-2">
                 <Button
                   variant="outline"
