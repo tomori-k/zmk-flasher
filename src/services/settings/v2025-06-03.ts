@@ -6,7 +6,7 @@ export const VERSION = '2025-06-03' as const
 export type VersionV20250603 = typeof VERSION
 
 export interface SettingsV20250603 {
-  version: VersionV20250603
+  __version__: VersionV20250603
   language: string
   repositories: Repository[]
   selectedRepositoryUrl: string | null
@@ -14,7 +14,7 @@ export interface SettingsV20250603 {
 
 // Default settings for this version
 export const DEFAULT_SETTINGS: SettingsV20250603 = {
-  version: VERSION,
+  __version__: VERSION,
   language: 'en',
   repositories: [],
   selectedRepositoryUrl: null,

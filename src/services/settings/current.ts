@@ -14,7 +14,7 @@ export type AnySettings = SettingsV20250602 | SettingsV20250603
 // The current settings type is the latest version
 export type Settings = SettingsV20250603
 
-export type SettingsWithoutVersion = Omit<Settings, 'version'>
+export type SettingsWithoutVersion = Omit<Settings, '__version__'>
 
 // Export the latest version code
 export const LATEST_VERSION = V20250603_VERSION
@@ -69,7 +69,7 @@ async function writeSettingsFile(settings: any): Promise<void> {
  * @throws Error if migration fails or version is not supported
  */
 export function migrate(settings: AnySettings): Settings {
-  switch (settings.version) {
+  switch (settings.__version__) {
     case V20250602_VERSION:
       return migrate(migrateV20250602ToV20250603(settings))
     case V20250603_VERSION:
@@ -91,7 +91,7 @@ export async function loadSettings(): Promise<SettingsWithoutVersion> {
     if (
       settings == null ||
       typeof settings !== 'object' ||
-      !('version' in settings)
+      !('__version__' in settings)
     ) {
       throw new Error('Invalid settings file')
     }
@@ -111,5 +111,5 @@ export async function loadSettings(): Promise<SettingsWithoutVersion> {
 export async function saveSettings(
   settings: SettingsWithoutVersion
 ): Promise<void> {
-  await writeSettingsFile({ ...settings, version: LATEST_VERSION })
+  await writeSettingsFile({ ...settings, __version__: LATEST_VERSION })
 }

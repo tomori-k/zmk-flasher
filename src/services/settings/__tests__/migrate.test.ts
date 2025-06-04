@@ -7,7 +7,7 @@ describe('settings migration', () => {
   it('should migrate from v2025-06-02 to v2025-06-03', () => {
     // Arrange
     const oldSettings: SettingsV20250602 = {
-      version: V20250602_VERSION,
+      __version__: V20250602_VERSION,
       language: 'ja',
     }
 
@@ -16,7 +16,7 @@ describe('settings migration', () => {
 
     // Assert
     expect(migratedSettings).toEqual({
-      version: V20250603_VERSION,
+      __version__: V20250603_VERSION,
       language: 'ja',
       repositories: [],
       selectedRepositoryUrl: null,
@@ -26,7 +26,7 @@ describe('settings migration', () => {
   it('should keep settings as is if already at latest version', () => {
     // Arrange
     const latestSettings: SettingsV20250603 = {
-      version: V20250603_VERSION,
+      __version__: V20250603_VERSION,
       language: 'ja',
       repositories: [
         { url: 'https://github.com/example/repo1' },
@@ -45,7 +45,7 @@ describe('settings migration', () => {
   it('should handle migration with custom language setting', () => {
     // Arrange
     const oldSettings: SettingsV20250602 = {
-      version: V20250602_VERSION,
+      __version__: V20250602_VERSION,
       language: 'fr', // カスタム言語設定
     }
 
@@ -54,7 +54,7 @@ describe('settings migration', () => {
 
     // Assert
     expect(migratedSettings).toEqual({
-      version: V20250603_VERSION,
+      __version__: V20250603_VERSION,
       language: 'fr', // 言語設定が保持されていること
       repositories: [],
       selectedRepositoryUrl: null,
@@ -68,7 +68,7 @@ describe('settings migration', () => {
 
     // Arrange
     const oldestSettings: SettingsV20250602 = {
-      version: V20250602_VERSION,
+      __version__: V20250602_VERSION,
       language: 'de',
     }
 
@@ -76,7 +76,7 @@ describe('settings migration', () => {
     const migratedToV20250603 = migrate(oldestSettings)
 
     // Assert
-    expect(migratedToV20250603.version).toBe(V20250603_VERSION)
+    expect(migratedToV20250603.__version__).toBe(V20250603_VERSION)
     expect(migratedToV20250603.language).toBe('de')
     expect(migratedToV20250603.repositories).toEqual([])
     expect(migratedToV20250603.selectedRepositoryUrl).toBeNull()
