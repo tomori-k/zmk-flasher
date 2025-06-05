@@ -40,6 +40,18 @@ export interface FirmwarePanelProps {
 }
 
 // GitHubのAPIを使って最新の複数の成功したActionsのartifactsを取得する関数
+interface GitHubArtifact {
+  id: number
+  name: string
+  archive_download_url: string
+  created_at: string
+  size_in_bytes: number
+}
+interface GitHubWorkflowRun {
+  id: number
+  head_branch: string
+  head_commit?: { message?: string }
+}
 const fetchLatestFirmware = async (
   repositoryUrl: string,
   workflowId: number | null,
@@ -58,13 +70,13 @@ const fetchLatestFirmware = async (
   const repository: Repository = { url: repositoryUrl }
 
   // 指定されたワークフローの最新の成功したランを複数取得
-  const workflowRuns = await apiClient.fetchWorkflowRuns(
+  const workflowRuns = (await apiClient.fetchWorkflowRuns(
     repository,
     workflowId,
     signal,
     1, // ページ番号
     runsCount // 取得する数
-  )
+  )) as GitHubWorkflowRun[]
 
   if (workflowRuns.length === 0) {
     throw new Error(
@@ -76,18 +88,18 @@ const fetchLatestFirmware = async (
   const firmwares: Firmware[] = []
 
   for (const run of workflowRuns) {
-    const artifacts = await apiClient.fetchWorkflowRunsArtifacts(
+    const artifacts = (await apiClient.fetchWorkflowRunsArtifacts(
       repository,
       run.id,
       signal
-    )
+    )) as GitHubArtifact[]
 
     if (artifacts.length > 0) {
       // コミットメッセージを取得
       const commitMessage = run.head_commit?.message || 'コミットメッセージなし'
 
       // このランのartifactsをFirmwareオブジェクトに変換
-      const runFirmwares = artifacts.map((artifact: any) => ({
+      const runFirmwares = artifacts.map((artifact: GitHubArtifact) => ({
         id: `github-artifact-${artifact.id}`,
         name: artifact.name,
         path: artifact.archive_download_url,

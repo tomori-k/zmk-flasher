@@ -19,7 +19,7 @@ export default function KeymapEditor() {
 
   return (
     <div className="flex justify-center">
-      <a href={DEFAULT_KEYMAP_EDITOR_URL} target="_blank">
+      <a href={DEFAULT_KEYMAP_EDITOR_URL} target="_blank" rel="noreferrer">
         <Button size="lg" onClick={handleOpenExternal} className="">
           <ExternalLink className="h-4 w-4" />
           {t('keymapEditor.openInBrowser')}

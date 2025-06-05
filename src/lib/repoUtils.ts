@@ -6,7 +6,7 @@
 export function extractRepoInfo(
   url: string
 ): { owner: string; repo: string } | null {
-  const githubRegex = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)/
+  const githubRegex = new RegExp('^https://github\\.com/([^/]+)/([^/]+)')
   const match = url.match(githubRegex)
 
   if (!match) {

@@ -51,7 +51,7 @@ async function readSettingsFile(): Promise<unknown | null> {
  * @param settings Settings object to save
  * @throws Error if file cannot be written
  */
-async function writeSettingsFile(settings: any): Promise<void> {
+async function writeSettingsFile(settings: Settings): Promise<void> {
   const appDirPath = await path.appDataDir()
   const settingsPath = await path.join(appDirPath, 'settings.json')
 

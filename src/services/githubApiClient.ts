@@ -25,7 +25,7 @@ export interface GitHubApiClient {
     signal: AbortSignal,
     page?: number,
     perPage?: number
-  ): Promise<any[]>
+  ): Promise<unknown[]>
 
   /**
    * ワークフロー実行のアーティファクトを取得
@@ -34,7 +34,7 @@ export interface GitHubApiClient {
     repository: Repository,
     workflowRunId: number,
     signal: AbortSignal
-  ): Promise<any[]>
+  ): Promise<unknown[]>
 }
 
 // デフォルトのAPI実装をエクスポート
@@ -75,7 +75,7 @@ export const githubApiClient: GitHubApiClient = {
     signal: AbortSignal,
     page: number = 1,
     perPage: number = 10
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     const repoInfo = extractRepoInfo(repository.url)
     if (!repoInfo) {
       throw new Error('無効なリポジトリURLです')
@@ -104,7 +104,7 @@ export const githubApiClient: GitHubApiClient = {
     repository: Repository,
     workflowRunId: number,
     signal: AbortSignal
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     const repoInfo = extractRepoInfo(repository.url)
     if (!repoInfo) {
       throw new Error('無効なリポジトリURLです')
