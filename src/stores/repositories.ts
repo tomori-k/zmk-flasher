@@ -61,9 +61,9 @@ export const useRepositoriesStore = create<
   setSelectedWorkflowId: (workflowId) => {
     const selectedRepo = get().getSelectedRepository()
     if (selectedRepo) {
-      const updatedRepo = {
+      const updatedRepo: Repository = {
         ...selectedRepo,
-        workflowId,
+        workflowId: workflowId === null ? undefined : workflowId,
       }
       get().updateRepository(updatedRepo)
     }

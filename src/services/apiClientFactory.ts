@@ -12,7 +12,10 @@ export const isTestMode = (): boolean => {
   }
 
   // あるいは実行時に window オブジェクトにフラグを設定することもできます
-  if (typeof window !== 'undefined' && (window as any).__USE_MOCK_API__) {
+  if (
+    typeof window !== 'undefined' &&
+    (window as { __USE_MOCK_API__?: boolean }).__USE_MOCK_API__
+  ) {
     return true
   }
 

@@ -9,9 +9,9 @@ import { extractRepoInfo } from '@/lib/repoUtils'
 export const mockGithubApiClient: GitHubApiClient = {
   async fetchWorkflows(
     repository: Repository,
-    signal: AbortSignal,
-    page: number = 1,
-    perPage: number = 10
+    _signal: AbortSignal,
+    _page: number = 1,
+    _perPage: number = 10
   ): Promise<Workflow[]> {
     // リポジトリの検証 (実際のAPIと同じ振る舞いを模倣)
     const repoInfo = extractRepoInfo(repository.url)
@@ -49,10 +49,10 @@ export const mockGithubApiClient: GitHubApiClient = {
   async fetchWorkflowRuns(
     repository: Repository,
     workflowId: number,
-    signal: AbortSignal,
-    page: number = 1,
-    perPage: number = 10
-  ): Promise<any[]> {
+    _signal: AbortSignal,
+    _page: number = 1,
+    _perPage: number = 10
+  ): Promise<unknown[]> {
     // リポジトリの検証
     const repoInfo = extractRepoInfo(repository.url)
     if (!repoInfo) {
@@ -79,9 +79,9 @@ export const mockGithubApiClient: GitHubApiClient = {
 
   async fetchWorkflowRunsArtifacts(
     repository: Repository,
-    workflowRunId: number,
-    signal: AbortSignal
-  ): Promise<any[]> {
+    _workflowRunId: number,
+    _signal: AbortSignal
+  ): Promise<unknown[]> {
     // リポジトリの検証
     const repoInfo = extractRepoInfo(repository.url)
     if (!repoInfo) {
