@@ -28,6 +28,7 @@
       "title": "Firmware Selection",
       "noFirmware": "No firmware available",
       "selectWorkflow": "Select workflow",
+      "runsCount": "Number of runs",
       "noWorkflows": "No workflows found",
       "selectFirmware": "Select firmware",
       "refresh": "Get latest firmware",
