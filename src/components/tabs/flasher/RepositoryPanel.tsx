@@ -102,7 +102,7 @@ export function RepositoryPanel({
                                 toast.dismiss(toastId)
                               }}
                             >
-                              {t('flasher.dialog.repository.add')}
+                              {t('flasher.dialog.repository.delete')}
                             </Button>
                           </div>
                         </div>
@@ -110,8 +110,8 @@ export function RepositoryPanel({
                     }}
                   >
                     <Trash className="h-4 w-4" />
-                    {t('flasher.repositoryPanel.addRepo')}
-                  </Button>
+                    {t('flasher.repositoryPanel.removeRepo')}
+                 </Button>
                 )}
               </>
             ) : (

@@ -21,6 +21,7 @@
     "repositoryPanel": {
       "title": "Firmware Source",
       "addRepo": "Add Repository",
+      "removeRepo": "Remove Repository",
       "noRepos": "No repositories added",
       "select": "Select a repository"
     },
@@ -61,9 +62,10 @@
         "description": "Enter the GitHub repository URL and access token",
         "url": "Repository URL",
         "pat": "Personal Access Token (optional)",
-        "savePat": "Save token",
-        "add": "Add",
-        "cancel": "Cancel"
+      "savePat": "Save token",
+      "add": "Add",
+      "delete": "Delete",
+      "cancel": "Cancel"
       },
       "progress": {
         "title": "Flashing Firmware",
