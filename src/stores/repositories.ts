@@ -127,10 +127,10 @@ export const useRepositoriesStore = create<
     const { workflows } = get()
     const selectedRepo = get().getSelectedRepository()
 
-    if (!selectedRepo || !workflows.length) return null
+    if (!selectedRepo || workflows.length === 0) return null
 
     // リポジトリに保存されたワークフローIDがあればそれを選択
-    if (selectedRepo.workflowId) {
+    if (selectedRepo.workflowId != null) {
       const savedWorkflow = workflows.find(
         (w) => w.id === selectedRepo.workflowId
       )
@@ -140,6 +140,6 @@ export const useRepositoriesStore = create<
     }
 
     // 保存されたワークフローIDがないか、見つからない場合は最初のものを返す
-    return null
+    return workflows[0]
   },
 }))
