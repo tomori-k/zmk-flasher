@@ -21,6 +21,7 @@
     "repositoryPanel": {
       "title": "ファームウェアソース",
       "addRepo": "リポジトリを追加",
+      "removeRepo": "リポジトリを削除",
       "noRepos": "リポジトリが追加されていません",
       "select": "リポジトリを選択"
     },
@@ -61,9 +62,10 @@
         "description": "GitHubリポジトリのURLとアクセストークンを入力してください",
         "url": "リポジトリURL",
         "pat": "個人アクセストークン（オプション）",
-        "savePat": "トークンを保存",
-        "add": "追加",
-        "cancel": "キャンセル"
+      "savePat": "トークンを保存",
+      "add": "追加",
+      "delete": "削除",
+      "cancel": "キャンセル"
       },
       "progress": {
         "title": "ファームウェア書き込み",
