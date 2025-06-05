@@ -28,6 +28,7 @@
       "title": "ファームウェア選択",
       "noFirmware": "利用可能なファームウェアがありません",
       "selectWorkflow": "ワークフローを選択",
+      "runsCount": "取得するラン数",
       "noWorkflows": "ワークフローが見つかりません",
       "selectFirmware": "ファームウェアを選択",
       "refresh": "最新のファームウェアを取得",

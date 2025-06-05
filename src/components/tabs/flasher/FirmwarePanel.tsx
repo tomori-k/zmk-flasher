@@ -9,6 +9,8 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Loader2,
   CheckCircle2,
@@ -127,6 +129,7 @@ export default function FirmwarePanel({
   const { t } = useTranslation()
   const [isLoadingLatestFirmwares, setIsLoadingLatestFirmwares] =
     useState(false)
+  const [runsCount, setRunsCount] = useState<number>(3)
 
   // リポジトリストアからselectedWorkflowを取得
   const { getSelectedWorkflow } = useRepositoriesStore()
@@ -156,7 +159,8 @@ export default function FirmwarePanel({
       const newFirmwares = await fetchLatestFirmware(
         selectedRepo,
         selectedWorkflow.id,
-        refLifetimeAbort.current.signal
+        refLifetimeAbort.current.signal,
+        runsCount
       )
 
       // 親コンポーネントにファームウェアリストを更新
@@ -222,17 +226,31 @@ export default function FirmwarePanel({
                       placeholder={t('flasher.firmwarePanel.selectWorkflow')}
                     />
                   </SelectTrigger>
-                  <SelectContent>
-                    {workflows.map((workflow) => (
-                      <SelectItem
-                        key={workflow.id}
-                        value={workflow.id.toString()}
-                      >
-                        {workflow.name} ({workflow.path})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SelectContent>
+                  {workflows.map((workflow) => (
+                    <SelectItem
+                      key={workflow.id}
+                      value={workflow.id.toString()}
+                    >
+                      {workflow.name} ({workflow.path})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="grid grid-cols-3 items-center gap-2">
+                <Label htmlFor="runs-count">
+                  {t('flasher.firmwarePanel.runsCount')}
+                </Label>
+                <Input
+                  id="runs-count"
+                  type="number"
+                  min={1}
+                  value={runsCount}
+                  onChange={(e) => setRunsCount(Number(e.target.value))}
+                  className="col-span-2"
+                />
+              </div>
 
                 <div className="flex justify-between items-center">
                   <h4 className="text-sm font-medium">
