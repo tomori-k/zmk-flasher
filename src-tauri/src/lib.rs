@@ -11,7 +11,8 @@ use std::{
 };
 use zip::ZipArchive;
 
-const RELEASE_URL: &str = "https://api.github.com/repos/tomori-k/zmk-config-broccoli/releases/latest";
+const RELEASE_URL: &str =
+    "https://api.github.com/repos/tomori-k/zmk-config-broccoli/releases/latest";
 const USER_AGENT: &str = "zmk-flasher/0.1.0";
 
 #[derive(Debug, Clone, Serialize)]
@@ -35,6 +36,7 @@ struct DeviceInfo {
 enum DeviceKind {
     Bootloader,
     Serial,
+    Usb,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -42,7 +44,18 @@ enum DeviceKind {
 enum DeviceStatus {
     BootloaderReady,
     AppMode,
+    BootloaderRequired,
     Unsupported,
+}
+
+#[derive(Debug, Default)]
+struct MacUsbDevice {
+    vendor_id: Option<u16>,
+    product_id: Option<u16>,
+    vendor_name: Option<String>,
+    product_name: Option<String>,
+    serial_number: Option<String>,
+    location_id: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -115,6 +128,7 @@ fn scan_devices_sync() -> Vec<DeviceInfo> {
     let mut devices = Vec::new();
     devices.extend(scan_uf2_volumes());
     devices.extend(scan_serial_devices());
+    devices.extend(scan_usb_devices());
     devices.sort_by(|a, b| {
         b.supported
             .cmp(&a.supported)
@@ -252,6 +266,170 @@ fn serial_device(port_name: String, info: UsbPortInfo) -> DeviceInfo {
     }
 }
 
+fn scan_usb_devices() -> Vec<DeviceInfo> {
+    #[cfg(target_os = "macos")]
+    {
+        scan_macos_usb_devices()
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Vec::new()
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn scan_macos_usb_devices() -> Vec<DeviceInfo> {
+    let Ok(output) = ProcessCommand::new("/usr/sbin/ioreg")
+        .args(["-p", "IOUSB", "-l", "-w", "0"])
+        .output()
+    else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    parse_macos_usb_devices(&text)
+        .into_iter()
+        .filter_map(usb_device_info)
+        .collect()
+}
+
+#[cfg(target_os = "macos")]
+fn parse_macos_usb_devices(text: &str) -> Vec<MacUsbDevice> {
+    let mut devices = Vec::new();
+    let mut current: Option<MacUsbDevice> = None;
+
+    for line in text.lines() {
+        if line.contains("<class IOUSBHostDevice") {
+            if let Some(device) = current.take() {
+                devices.push(device);
+            }
+            current = Some(MacUsbDevice::default());
+            continue;
+        }
+
+        let Some(device) = current.as_mut() else {
+            continue;
+        };
+
+        let trimmed = ioreg_trimmed_line(line);
+        if trimmed == "}" {
+            if let Some(device) = current.take() {
+                devices.push(device);
+            }
+            continue;
+        }
+
+        if let Some(value) = ioreg_string_value(trimmed, "USB Vendor Name")
+            .or_else(|| ioreg_string_value(trimmed, "kUSBVendorString"))
+        {
+            device.vendor_name = Some(value);
+        } else if let Some(value) = ioreg_string_value(trimmed, "USB Product Name")
+            .or_else(|| ioreg_string_value(trimmed, "kUSBProductString"))
+        {
+            device.product_name = Some(value);
+        } else if let Some(value) = ioreg_string_value(trimmed, "USB Serial Number")
+            .or_else(|| ioreg_string_value(trimmed, "kUSBSerialNumberString"))
+        {
+            device.serial_number = Some(value);
+        } else if let Some(value) = ioreg_u32_value(trimmed, "idVendor") {
+            device.vendor_id = Some(value as u16);
+        } else if let Some(value) = ioreg_u32_value(trimmed, "idProduct") {
+            device.product_id = Some(value as u16);
+        } else if let Some(value) = ioreg_u32_value(trimmed, "locationID") {
+            device.location_id = Some(value);
+        }
+    }
+
+    if let Some(device) = current {
+        devices.push(device);
+    }
+
+    devices
+}
+
+fn usb_device_info(device: MacUsbDevice) -> Option<DeviceInfo> {
+    let vendor_name = device.vendor_name.as_deref().unwrap_or_default();
+    let product_name = device.product_name.as_deref().unwrap_or_default();
+    let serial_number = device.serial_number.as_deref().unwrap_or_default();
+    let usb_text = format!(
+        "{vendor_name}\n{product_name}\n{serial_number}\n{:04x}\n{:04x}",
+        device.vendor_id.unwrap_or_default(),
+        device.product_id.unwrap_or_default()
+    );
+    let supported = looks_like_xiao_ble(&usb_text) || looks_like_zmk_candidate(&usb_text);
+    if !supported {
+        return None;
+    }
+
+    let label = if product_name.is_empty() {
+        "ZMK keyboard".to_string()
+    } else {
+        product_name.to_string()
+    };
+    let detail = format!(
+        "{} · VID {:04x} PID {:04x}",
+        vendor_name,
+        device.vendor_id.unwrap_or_default(),
+        device.product_id.unwrap_or_default()
+    );
+
+    Some(DeviceInfo {
+        id: format!(
+            "usb:{}:{}:{}",
+            device.location_id.unwrap_or_default(),
+            device.vendor_id.unwrap_or_default(),
+            device.product_id.unwrap_or_default()
+        ),
+        label,
+        model: if looks_like_xiao_ble(&usb_text) {
+            "XIAO BLE".to_string()
+        } else {
+            "ZMK keyboard".to_string()
+        },
+        kind: DeviceKind::Usb,
+        status: DeviceStatus::BootloaderRequired,
+        status_label: "Bootloader needed".to_string(),
+        supported,
+        can_flash: false,
+        can_enter_bootloader: false,
+        mount_path: None,
+        port_name: None,
+        detail: Some(detail),
+    })
+}
+
+fn ioreg_string_value(line: &str, key: &str) -> Option<String> {
+    let prefix = format!("\"{key}\" = ");
+    let value = line.strip_prefix(&prefix)?;
+    value
+        .trim()
+        .strip_prefix('"')?
+        .strip_suffix('"')
+        .map(ToString::to_string)
+}
+
+fn ioreg_trimmed_line(line: &str) -> &str {
+    let mut trimmed = line.trim();
+    while let Some(next) = trimmed.strip_prefix('|') {
+        trimmed = next.trim_start();
+    }
+    trimmed
+}
+
+fn ioreg_u32_value(line: &str, key: &str) -> Option<u32> {
+    let prefix = format!("\"{key}\" = ");
+    let value = line.strip_prefix(&prefix)?.trim();
+    if let Some(hex) = value.strip_prefix("0x") {
+        u32::from_str_radix(hex, 16).ok()
+    } else {
+        value.parse().ok()
+    }
+}
+
 fn usb_info_text(info: &UsbPortInfo) -> String {
     format!(
         "{}\n{}\n{}\n{:04x}\n{:04x}",
@@ -283,7 +461,10 @@ fn fetch_latest_release_sync() -> Result<ReleaseInfo, String> {
         .send()
         .map_err(|error| format!("Failed to request GitHub release: {error}"))?;
     if !response.status().is_success() {
-        return Err(format!("GitHub release request failed: {}", response.status()));
+        return Err(format!(
+            "GitHub release request failed: {}",
+            response.status()
+        ));
     }
 
     let release: GitHubRelease = response
@@ -341,13 +522,19 @@ fn flash_device_sync(device_id: &str, asset_id: u64) -> Result<FlashResult, Stri
         return Err("Selected device is not supported.".to_string());
     }
 
-    if matches!(device.kind, DeviceKind::Serial) {
-        let port_name = device
-            .port_name
-            .clone()
-            .ok_or_else(|| "Selected serial device has no port.".to_string())?;
-        touch_1200_bps(&port_name)?;
-        device = wait_for_bootloader(Duration::from_secs(30))?;
+    match device.kind {
+        DeviceKind::Serial => {
+            let port_name = device
+                .port_name
+                .clone()
+                .ok_or_else(|| "Selected serial device has no port.".to_string())?;
+            touch_1200_bps(&port_name)?;
+            device = wait_for_bootloader(Duration::from_secs(30))?;
+        }
+        DeviceKind::Usb => {
+            device = wait_for_bootloader(Duration::from_secs(45))?;
+        }
+        DeviceKind::Bootloader => {}
     }
 
     let mount_path = device
@@ -395,13 +582,12 @@ fn touch_1200_bps(port_name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn list_uf2_assets_in_zip(tag_name: &str, asset: &GitHubAsset) -> Result<Vec<FirmwareAsset>, String> {
-    let zip_path = download_release_asset(
-        tag_name,
-        asset.id,
-        &asset.name,
-        &asset.browser_download_url,
-    )?;
+fn list_uf2_assets_in_zip(
+    tag_name: &str,
+    asset: &GitHubAsset,
+) -> Result<Vec<FirmwareAsset>, String> {
+    let zip_path =
+        download_release_asset(tag_name, asset.id, &asset.name, &asset.browser_download_url)?;
     let zip_file = fs::File::open(&zip_path)
         .map_err(|error| format!("Failed to open firmware archive: {error}"))?;
     let mut archive = ZipArchive::new(zip_file)
@@ -456,7 +642,11 @@ fn download_release_asset(
     download_url: &str,
 ) -> Result<PathBuf, String> {
     let cache_dir = firmware_cache_dir(tag_name)?;
-    let path = cache_dir.join(format!("{}-{}", asset_id, sanitize_path_segment(asset_name)));
+    let path = cache_dir.join(format!(
+        "{}-{}",
+        asset_id,
+        sanitize_path_segment(asset_name)
+    ));
 
     if path.exists() {
         return Ok(path);
@@ -522,7 +712,9 @@ fn extract_firmware_from_zip(
 }
 
 fn firmware_cache_dir(tag_name: &str) -> Result<PathBuf, String> {
-    let cache_dir = std::env::temp_dir().join("zmk-flasher").join(sanitize_path_segment(tag_name));
+    let cache_dir = std::env::temp_dir()
+        .join("zmk-flasher")
+        .join(sanitize_path_segment(tag_name));
     fs::create_dir_all(&cache_dir)
         .map_err(|error| format!("Failed to create firmware cache directory: {error}"))?;
     Ok(cache_dir)
@@ -630,5 +822,31 @@ mod tests {
 
         // Then: 同じ ID になる
         assert_eq!(first, second);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn macos_ioreg_zmk_device_is_detected() {
+        // Given: ZMK 書き込み済み device の ioreg 出力がある
+        let text = r#"
+  | +-o IOUSBHostDevice@01100000  <class IOUSBHostDevice, id 0x100052f66, registered, matched, active, busy 0 (5 ms), retain 20>
+  |     {
+  |       "idProduct" = 24926
+  |       "USB Vendor Name" = "ZMK Project"
+  |       "idVendor" = 7504
+  |       "USB Serial Number" = "6C573C3673E50A39"
+  |       "locationID" = 17825792
+  |       "kUSBVendorString" = "ZMK Project"
+  |     }
+"#;
+
+        // When: macOS USB device を抽出する
+        let devices = parse_macos_usb_devices(text);
+        let info = usb_device_info(devices.into_iter().next().unwrap()).unwrap();
+
+        // Then: bootloader が必要な ZMK keyboard として扱う
+        assert!(info.supported);
+        assert!(!info.can_flash);
+        assert_eq!(info.status_label, "Bootloader needed");
     }
 }

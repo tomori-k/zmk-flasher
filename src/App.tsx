@@ -11,13 +11,13 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { backendInvoke } from "./backend";
 
-type DeviceStatus = "bootloader_ready" | "app_mode" | "unsupported" | "unknown";
+type DeviceStatus = "bootloader_ready" | "app_mode" | "bootloader_required" | "unsupported" | "unknown";
 
 type DeviceInfo = {
   id: string;
   label: string;
   model: string;
-  kind: "bootloader" | "serial" | "unknown";
+  kind: "bootloader" | "serial" | "usb" | "unknown";
   status: DeviceStatus;
   status_label: string;
   supported: boolean;
@@ -58,6 +58,7 @@ type AppMessage = {
 const statusTone: Record<DeviceStatus, string> = {
   bootloader_ready: "border-mint/30 bg-mint/10 text-mint",
   app_mode: "border-brass/30 bg-brass/10 text-brass",
+  bootloader_required: "border-brass/30 bg-brass/10 text-brass",
   unsupported: "border-coral/30 bg-coral/10 text-coral",
   unknown: "border-line bg-white text-ink/70",
 };
@@ -150,6 +151,8 @@ function App() {
       text:
         selectedDevice.status === "app_mode"
           ? "Entering bootloader mode and writing firmware..."
+          : selectedDevice.status === "bootloader_required"
+            ? "Waiting for bootloader mode and writing firmware..."
           : "Writing firmware...",
     });
     try {
@@ -223,7 +226,13 @@ function App() {
                     type="button"
                   >
                     <span className="grid h-11 w-11 place-items-center rounded-md bg-white text-ink shadow-sm">
-                      {device.kind === "bootloader" ? <HardDrive size={22} /> : <Cpu size={22} />}
+                      {device.kind === "bootloader" ? (
+                        <HardDrive size={22} />
+                      ) : device.kind === "usb" ? (
+                        <Usb size={22} />
+                      ) : (
+                        <Cpu size={22} />
+                      )}
                     </span>
                     <span className="min-w-0 flex-1 text-left">
                       <span className="block truncate text-base font-semibold">{device.label}</span>
@@ -290,6 +299,11 @@ function App() {
                   <strong>{selectedAsset?.name ?? "none"}</strong>
                 </div>
               </div>
+              {selectedDevice?.supported && !selectedDevice.can_flash && (
+                <p className="mt-4 rounded-md border border-brass/30 bg-brass/10 px-3 py-2 text-sm font-medium text-brass">
+                  Bootloader mode is required.
+                </p>
+              )}
               <button
                 className="primary-button mt-5"
                 disabled={!readyToFlash}
