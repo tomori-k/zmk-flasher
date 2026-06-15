@@ -7,13 +7,21 @@ use std::{
     io::{self, Write},
     path::{Path, PathBuf},
     process::Command as ProcessCommand,
+    sync::{Mutex, OnceLock},
     time::Duration,
 };
 use zip::ZipArchive;
 
 const RELEASE_URL: &str =
     "https://api.github.com/repos/tomori-k/zmk-config-broccoli/releases/latest";
+const FALLBACK_RELEASE_TAG: &str = "firmware-20260616-2082787";
+const FALLBACK_RELEASE_URL: &str =
+    "https://github.com/tomori-k/zmk-config-broccoli/releases/tag/firmware-20260616-2082787";
+const FALLBACK_ZIP_ASSET_ID: u64 = 448_561_773;
+const FALLBACK_ZIP_ASSET_NAME: &str = "firmware-20260616-2082787.zip";
 const USER_AGENT: &str = "zmk-flasher/0.1.0";
+
+static RELEASE_CACHE: OnceLock<Mutex<Option<ReleaseInfo>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize)]
 struct DeviceInfo {
@@ -551,9 +559,33 @@ fn looks_like_zmk_candidate(value: &str) -> bool {
 }
 
 fn fetch_latest_release_sync() -> Result<ReleaseInfo, String> {
+    match fetch_latest_release_from_github() {
+        Ok(release) => {
+            cache_release(&release);
+            Ok(release)
+        }
+        Err(error) => {
+            if let Some(release) = cached_release() {
+                return Ok(release);
+            }
+            let release = fallback_release().map_err(|fallback_error| {
+                format!("{error}; fallback release failed: {fallback_error}")
+            })?;
+            cache_release(&release);
+            Ok(release)
+        }
+    }
+}
+
+fn cached_release_or_fetch() -> Result<ReleaseInfo, String> {
+    cached_release().map_or_else(fetch_latest_release_sync, Ok)
+}
+
+fn fetch_latest_release_from_github() -> Result<ReleaseInfo, String> {
     let client = http_client()?;
     let response = client
         .get(RELEASE_URL)
+        .header("Accept", "application/vnd.github+json")
         .send()
         .map_err(|error| format!("Failed to request GitHub release: {error}"))?;
     if !response.status().is_success() {
@@ -600,8 +632,52 @@ fn fetch_latest_release_sync() -> Result<ReleaseInfo, String> {
     })
 }
 
+fn fallback_release() -> Result<ReleaseInfo, String> {
+    let asset = fallback_zip_asset();
+    let assets = list_uf2_assets_in_zip(FALLBACK_RELEASE_TAG, &asset)?;
+    if assets.is_empty() {
+        return Err("No UF2 firmware asset was found in the fallback release.".to_string());
+    }
+
+    Ok(ReleaseInfo {
+        tag_name: FALLBACK_RELEASE_TAG.to_string(),
+        name: Some(FALLBACK_RELEASE_TAG.to_string()),
+        html_url: FALLBACK_RELEASE_URL.to_string(),
+        published_at: None,
+        assets,
+    })
+}
+
+fn fallback_zip_asset() -> GitHubAsset {
+    GitHubAsset {
+        id: FALLBACK_ZIP_ASSET_ID,
+        name: FALLBACK_ZIP_ASSET_NAME.to_string(),
+        size: 0,
+        browser_download_url: format!(
+            "https://github.com/tomori-k/zmk-config-broccoli/releases/download/{FALLBACK_RELEASE_TAG}/{FALLBACK_ZIP_ASSET_NAME}"
+        ),
+    }
+}
+
+fn release_cache() -> &'static Mutex<Option<ReleaseInfo>> {
+    RELEASE_CACHE.get_or_init(|| Mutex::new(None))
+}
+
+fn cached_release() -> Option<ReleaseInfo> {
+    release_cache()
+        .lock()
+        .ok()
+        .and_then(|release| release.clone())
+}
+
+fn cache_release(release: &ReleaseInfo) {
+    if let Ok(mut cache) = release_cache().lock() {
+        *cache = Some(release.clone());
+    }
+}
+
 fn flash_device_sync(device_id: &str, asset_id: String) -> Result<FlashResult, String> {
-    let release = fetch_latest_release_sync()?;
+    let release = cached_release_or_fetch()?;
     let asset = release
         .assets
         .iter()
@@ -744,7 +820,7 @@ fn extract_firmware_from_zip(
     let cache_dir = firmware_cache_dir(tag_name)?;
     let output_path = cache_dir.join(format!(
         "{}-{}",
-        asset.id,
+        sanitize_path_segment(&asset.id),
         sanitize_path_segment(&asset.name)
     ));
 
@@ -883,6 +959,33 @@ mod tests {
 
         // Then: GitHub asset ID と zip entry 名が文字列で残る
         assert_eq!(id, "448561773:broccoli_left-seeeduino_xiao_ble-zmk.uf2");
+    }
+
+    #[test]
+    fn firmware_entry_id_can_be_sanitized_for_cache_path() {
+        // Given: directory を含む zip entry がある
+        let id = firmware_entry_id(448561773, "nested/broccoli_left.uf2");
+
+        // When: cache path 用に整形する
+        let sanitized = sanitize_path_segment(&id);
+
+        // Then: path separator は残らない
+        assert_eq!(sanitized, "448561773_nested_broccoli_left.uf2");
+    }
+
+    #[test]
+    fn fallback_zip_asset_uses_release_download_url() {
+        // Given: GitHub API が使えない場合
+        let asset = fallback_zip_asset();
+
+        // When: fallback asset を作る
+        let url = asset.browser_download_url;
+
+        // Then: 固定 release の download URL を使う
+        assert_eq!(
+            url,
+            "https://github.com/tomori-k/zmk-config-broccoli/releases/download/firmware-20260616-2082787/firmware-20260616-2082787.zip"
+        );
     }
 
     #[test]
