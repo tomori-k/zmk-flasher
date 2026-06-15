@@ -6,9 +6,10 @@ export default {
     extend: {
       colors: {
         ink: "#172026",
-        panel: "#F7F4EC",
-        line: "#D8D1C3",
-        mint: "#2D8C70",
+        panel: "#F5F7FA",
+        line: "#DDE5EC",
+        mint: "#0F8B6F",
+        azure: "#2F6FD6",
         coral: "#C95038",
         brass: "#9A741D",
       },
