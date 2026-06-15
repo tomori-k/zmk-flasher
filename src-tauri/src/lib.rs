@@ -64,7 +64,7 @@ struct MacUsbDevice {
 
 #[derive(Debug, Clone, Serialize)]
 struct FirmwareAsset {
-    id: u64,
+    id: String,
     name: String,
     size: u64,
     download_url: String,
@@ -122,7 +122,7 @@ async fn fetch_latest_release() -> Result<ReleaseInfo, String> {
 }
 
 #[tauri::command]
-async fn flash_device(device_id: String, asset_id: u64) -> Result<FlashResult, String> {
+async fn flash_device(device_id: String, asset_id: String) -> Result<FlashResult, String> {
     tauri::async_runtime::spawn_blocking(move || flash_device_sync(&device_id, asset_id))
         .await
         .map_err(|error| format!("Flash task failed: {error}"))?
@@ -571,7 +571,7 @@ fn fetch_latest_release_sync() -> Result<ReleaseInfo, String> {
         let lower_name = asset.name.to_ascii_lowercase();
         if lower_name.ends_with(".uf2") {
             assets.push(FirmwareAsset {
-                id: asset.id,
+                id: asset.id.to_string(),
                 name: asset.name.clone(),
                 size: asset.size,
                 download_url: asset.browser_download_url,
@@ -600,7 +600,7 @@ fn fetch_latest_release_sync() -> Result<ReleaseInfo, String> {
     })
 }
 
-fn flash_device_sync(device_id: &str, asset_id: u64) -> Result<FlashResult, String> {
+fn flash_device_sync(device_id: &str, asset_id: String) -> Result<FlashResult, String> {
     let release = fetch_latest_release_sync()?;
     let asset = release
         .assets
@@ -800,18 +800,8 @@ fn sanitize_path_segment(value: &str) -> String {
         .collect()
 }
 
-fn firmware_entry_id(source_asset_id: u64, entry_name: &str) -> u64 {
-    let mut hash = 0xcbf29ce484222325_u64;
-    for byte in source_asset_id
-        .to_string()
-        .bytes()
-        .chain([b':'])
-        .chain(entry_name.bytes())
-    {
-        hash ^= u64::from(byte);
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    hash
+fn firmware_entry_id(source_asset_id: u64, entry_name: &str) -> String {
+    format!("{source_asset_id}:{entry_name}")
 }
 
 fn flush_disk_buffers() {
@@ -881,6 +871,18 @@ mod tests {
 
         // Then: 同じ ID になる
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn firmware_entry_id_is_lossless_text() {
+        // Given: zip 内 UF2 の名前がある
+        let entry_name = "broccoli_left-seeeduino_xiao_ble-zmk.uf2";
+
+        // When: frontend に渡す ID を作る
+        let id = firmware_entry_id(448561773, entry_name);
+
+        // Then: GitHub asset ID と zip entry 名が文字列で残る
+        assert_eq!(id, "448561773:broccoli_left-seeeduino_xiao_ble-zmk.uf2");
     }
 
     #[test]

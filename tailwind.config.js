@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  safelist: ["message-info", "message-success", "message-error"],
   theme: {
     extend: {
       colors: {

@@ -51,7 +51,7 @@ export async function backendInvoke<T>(command: string, args?: Record<string, un
           return name.endsWith(".uf2") || name.endsWith(".zip");
         })
         .map((asset) => ({
-          id: asset.id,
+          id: String(asset.id),
           name: asset.name,
           size: asset.size,
           download_url: asset.browser_download_url,

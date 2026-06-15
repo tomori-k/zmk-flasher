@@ -33,7 +33,7 @@ type DeviceInfo = {
 };
 
 type FirmwareAsset = {
-  id: number;
+  id: string;
   name: string;
   size: number;
   download_url: string;
@@ -87,7 +87,7 @@ function App() {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [release, setRelease] = useState<ReleaseInfo | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
-  const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [loadingRelease, setLoadingRelease] = useState(false);
   const [flashing, setFlashing] = useState(false);
@@ -270,7 +270,7 @@ function App() {
                     className="select-field"
                     id="asset"
                     value={selectedAssetId ?? ""}
-                    onChange={(event) => setSelectedAssetId(Number(event.target.value))}
+                    onChange={(event) => setSelectedAssetId(event.target.value)}
                   >
                     {release.assets.map((asset) => (
                       <option key={asset.id} value={asset.id}>
@@ -322,7 +322,7 @@ function App() {
         </section>
 
         {message && (
-          <div className={`message-bar message-${message.tone}`} role="status">
+          <div className={messageClassName(message.tone)} role="status">
             {message.tone === "success" ? <CheckCircle2 size={18} /> : <span className="h-2 w-2 rounded-full bg-current" />}
             <span>{message.text}</span>
           </div>
@@ -333,3 +333,9 @@ function App() {
 }
 
 export default App;
+
+function messageClassName(tone: AppMessage["tone"]) {
+  if (tone === "success") return "message-bar message-success";
+  if (tone === "error") return "message-bar message-error";
+  return "message-bar message-info";
+}
