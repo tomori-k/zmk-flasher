@@ -25,6 +25,10 @@ type DeviceInfo = {
   can_enter_bootloader: boolean;
   mount_path?: string;
   port_name?: string;
+  vendor_id?: number;
+  product_id?: number;
+  serial_number?: string;
+  location_id?: number;
   detail?: string;
 };
 

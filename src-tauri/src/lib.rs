@@ -2,6 +2,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serialport::{SerialPortType, UsbPortInfo};
 use std::{
+    collections::HashSet,
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -27,6 +28,10 @@ struct DeviceInfo {
     can_enter_bootloader: bool,
     mount_path: Option<String>,
     port_name: Option<String>,
+    vendor_id: Option<u16>,
+    product_id: Option<u16>,
+    serial_number: Option<String>,
+    location_id: Option<u32>,
     detail: Option<String>,
 }
 
@@ -128,6 +133,7 @@ fn scan_devices_sync() -> Vec<DeviceInfo> {
     devices.extend(scan_uf2_volumes());
     devices.extend(scan_serial_devices());
     devices.extend(scan_usb_devices());
+    let mut devices = dedupe_devices(devices);
     devices.sort_by(|a, b| {
         b.supported
             .cmp(&a.supported)
@@ -135,6 +141,80 @@ fn scan_devices_sync() -> Vec<DeviceInfo> {
             .then_with(|| a.label.cmp(&b.label))
     });
     devices
+}
+
+fn dedupe_devices(devices: Vec<DeviceInfo>) -> Vec<DeviceInfo> {
+    let bootloader_products: HashSet<(u16, u16)> = devices
+        .iter()
+        .filter(|device| matches!(device.kind, DeviceKind::Bootloader) && device.can_flash)
+        .filter_map(device_product_key)
+        .collect();
+    let serial_products: HashSet<(u16, u16)> = devices
+        .iter()
+        .filter(|device| matches!(device.kind, DeviceKind::Serial) && device.supported)
+        .filter_map(device_product_key)
+        .collect();
+    let mut seen_serials = HashSet::new();
+    let mut deduped = Vec::new();
+
+    let mut ordered = devices;
+    ordered.sort_by_key(dedupe_priority);
+
+    for device in ordered {
+        if !matches!(device.kind, DeviceKind::Bootloader)
+            && device_product_key(&device).is_some_and(|key| bootloader_products.contains(&key))
+        {
+            continue;
+        }
+
+        if matches!(device.kind, DeviceKind::Usb)
+            && device_product_key(&device).is_some_and(|key| serial_products.contains(&key))
+        {
+            continue;
+        }
+
+        if matches!(device.kind, DeviceKind::Serial)
+            && serial_dedupe_key(&device).is_some_and(|key| !seen_serials.insert(key))
+        {
+            continue;
+        }
+
+        deduped.push(device);
+    }
+
+    deduped
+}
+
+fn dedupe_priority(device: &DeviceInfo) -> u8 {
+    match device.kind {
+        DeviceKind::Bootloader => 0,
+        DeviceKind::Serial
+            if device
+                .port_name
+                .as_deref()
+                .is_some_and(|port| port.contains("/cu.")) =>
+        {
+            1
+        }
+        DeviceKind::Serial => 2,
+        DeviceKind::Usb => 3,
+    }
+}
+
+fn device_product_key(device: &DeviceInfo) -> Option<(u16, u16)> {
+    Some((device.vendor_id?, device.product_id?))
+}
+
+fn serial_dedupe_key(device: &DeviceInfo) -> Option<String> {
+    Some(format!(
+        "{:04x}:{:04x}:{}",
+        device.vendor_id?,
+        device.product_id?,
+        device
+            .serial_number
+            .as_deref()
+            .unwrap_or(device.label.as_str())
+    ))
 }
 
 fn scan_uf2_volumes() -> Vec<DeviceInfo> {
@@ -179,6 +259,11 @@ fn uf2_volume_device(path: PathBuf) -> Option<DeviceInfo> {
         .to_string();
     let info = fs::read_to_string(&info_path).unwrap_or_default();
     let supported = looks_like_xiao_ble(&format!("{volume_name}\n{info}"));
+    let (vendor_id, product_id) = if supported {
+        (Some(0x2886), Some(0x0045))
+    } else {
+        (None, None)
+    };
     let status = if supported {
         DeviceStatus::BootloaderReady
     } else {
@@ -205,6 +290,10 @@ fn uf2_volume_device(path: PathBuf) -> Option<DeviceInfo> {
         can_enter_bootloader: false,
         mount_path: Some(path.display().to_string()),
         port_name: None,
+        vendor_id,
+        product_id,
+        serial_number: None,
+        location_id: None,
         detail: Some(path.display().to_string()),
     })
 }
@@ -258,6 +347,10 @@ fn serial_device(port_name: String, info: UsbPortInfo) -> DeviceInfo {
         can_enter_bootloader: supported,
         mount_path: None,
         port_name: Some(port_name.clone()),
+        vendor_id: Some(info.vid),
+        product_id: Some(info.pid),
+        serial_number: info.serial_number.clone(),
+        location_id: None,
         detail: Some(format!(
             "{} · VID {:04x} PID {:04x}",
             port_name, info.vid, info.pid
@@ -397,6 +490,10 @@ fn usb_device_info(device: MacUsbDevice) -> Option<DeviceInfo> {
         can_enter_bootloader: false,
         mount_path: None,
         port_name: None,
+        vendor_id: device.vendor_id,
+        product_id: device.product_id,
+        serial_number: device.serial_number,
+        location_id: device.location_id,
         detail: Some(detail),
     })
 }
@@ -810,5 +907,72 @@ mod tests {
         assert!(info.supported);
         assert!(!info.can_flash);
         assert_eq!(info.status_label, "Bootloader needed");
+    }
+
+    #[test]
+    fn bootloader_device_hides_same_product_usb_and_serial_devices() {
+        // Given: 同じ XIAO BLE が複数の USB 表現で見えている
+        let bootloader = test_device(DeviceKind::Bootloader, "volume:XIAO-SENSE", true);
+        let serial = test_device(DeviceKind::Serial, "serial:/dev/cu.usbmodem1101", false);
+        let usb = test_device(DeviceKind::Usb, "usb:17825792:10374:69", false);
+
+        // When: device 一覧を整理する
+        let devices = dedupe_devices(vec![serial, bootloader, usb]);
+
+        // Then: 書き込み可能な bootloader だけを残す
+        assert_eq!(devices.len(), 1);
+        assert!(matches!(devices[0].kind, DeviceKind::Bootloader));
+    }
+
+    #[test]
+    fn cu_serial_device_hides_tty_serial_twin() {
+        // Given: macOS の cu と tty serial port が同じ device を指している
+        let cu = test_serial_device("/dev/cu.usbmodem1101");
+        let tty = test_serial_device("/dev/tty.usbmodem1101");
+
+        // When: device 一覧を整理する
+        let devices = dedupe_devices(vec![tty, cu]);
+
+        // Then: cu 側だけを残す
+        assert_eq!(devices.len(), 1);
+        assert_eq!(
+            devices[0].port_name.as_deref(),
+            Some("/dev/cu.usbmodem1101")
+        );
+    }
+
+    fn test_serial_device(port_name: &str) -> DeviceInfo {
+        let mut device = test_device(DeviceKind::Serial, &format!("serial:{port_name}"), false);
+        device.port_name = Some(port_name.to_string());
+        device
+    }
+
+    fn test_device(kind: DeviceKind, id: &str, can_flash: bool) -> DeviceInfo {
+        DeviceInfo {
+            id: id.to_string(),
+            label: "XIAO nRF52840 Sense".to_string(),
+            model: "XIAO BLE".to_string(),
+            kind,
+            status: if can_flash {
+                DeviceStatus::BootloaderReady
+            } else {
+                DeviceStatus::AppMode
+            },
+            status_label: if can_flash {
+                "Ready to write".to_string()
+            } else {
+                "App mode".to_string()
+            },
+            supported: true,
+            can_flash,
+            can_enter_bootloader: false,
+            mount_path: can_flash.then(|| "/Volumes/XIAO-SENSE".to_string()),
+            port_name: None,
+            vendor_id: Some(0x2886),
+            product_id: Some(0x0045),
+            serial_number: Some("6C573C3673E50A39".to_string()),
+            location_id: Some(17_825_792),
+            detail: None,
+        }
     }
 }
