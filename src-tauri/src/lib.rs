@@ -6,8 +6,7 @@ use std::{
     io::{self, Write},
     path::{Path, PathBuf},
     process::Command as ProcessCommand,
-    thread,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use zip::ZipArchive;
 
@@ -255,7 +254,7 @@ fn serial_device(port_name: String, info: UsbPortInfo) -> DeviceInfo {
             "Unsupported".to_string()
         },
         supported,
-        can_flash: supported,
+        can_flash: false,
         can_enter_bootloader: supported,
         mount_path: None,
         port_name: Some(port_name.clone()),
@@ -513,7 +512,7 @@ fn flash_device_sync(device_id: &str, asset_id: u64) -> Result<FlashResult, Stri
         .ok_or_else(|| "Selected firmware asset was not found in the latest release.".to_string())?
         .clone();
 
-    let mut device = scan_devices_sync()
+    let device = scan_devices_sync()
         .into_iter()
         .find(|device| device.id == device_id)
         .ok_or_else(|| "Selected device is no longer connected.".to_string())?;
@@ -522,19 +521,8 @@ fn flash_device_sync(device_id: &str, asset_id: u64) -> Result<FlashResult, Stri
         return Err("Selected device is not supported.".to_string());
     }
 
-    match device.kind {
-        DeviceKind::Serial => {
-            let port_name = device
-                .port_name
-                .clone()
-                .ok_or_else(|| "Selected serial device has no port.".to_string())?;
-            touch_1200_bps(&port_name)?;
-            device = wait_for_bootloader(Duration::from_secs(30))?;
-        }
-        DeviceKind::Usb => {
-            device = wait_for_bootloader(Duration::from_secs(45))?;
-        }
-        DeviceKind::Bootloader => {}
+    if !device.can_flash {
+        return Err("Device is not in bootloader mode.".to_string());
     }
 
     let mount_path = device
@@ -554,32 +542,6 @@ fn flash_device_sync(device_id: &str, asset_id: u64) -> Result<FlashResult, Stri
         device_label: device.label,
         mount_path,
     })
-}
-
-fn wait_for_bootloader(timeout: Duration) -> Result<DeviceInfo, String> {
-    let started = Instant::now();
-    while started.elapsed() < timeout {
-        if let Some(device) = scan_uf2_volumes()
-            .into_iter()
-            .find(|device| device.supported && device.can_flash)
-        {
-            return Ok(device);
-        }
-        thread::sleep(Duration::from_millis(500));
-    }
-    Err("Bootloader volume did not appear after reset.".to_string())
-}
-
-fn touch_1200_bps(port_name: &str) -> Result<(), String> {
-    let mut port = serialport::new(port_name, 1200)
-        .timeout(Duration::from_millis(500))
-        .open()
-        .map_err(|error| format!("Failed to open serial port for bootloader reset: {error}"))?;
-    let _ = port.write_data_terminal_ready(false);
-    let _ = port.write_request_to_send(false);
-    thread::sleep(Duration::from_millis(100));
-    drop(port);
-    Ok(())
 }
 
 fn list_uf2_assets_in_zip(

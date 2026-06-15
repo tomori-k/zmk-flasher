@@ -55,6 +55,8 @@ type AppMessage = {
   text: string;
 };
 
+const deviceScanIntervalMs = 1000;
+
 const statusTone: Record<DeviceStatus, string> = {
   bootloader_ready: "border-mint/30 bg-mint/10 text-mint",
   app_mode: "border-brass/30 bg-brass/10 text-brass",
@@ -136,7 +138,7 @@ function App() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       void refreshDevices(true);
-    }, 3500);
+    }, deviceScanIntervalMs);
     return () => window.clearInterval(timer);
   }, [refreshDevices]);
 
@@ -149,11 +151,9 @@ function App() {
     setMessage({
       tone: "info",
       text:
-        selectedDevice.status === "app_mode"
-          ? "Entering bootloader mode and writing firmware..."
-          : selectedDevice.status === "bootloader_required"
-            ? "Waiting for bootloader mode and writing firmware..."
-          : "Writing firmware...",
+        selectedDevice.status === "bootloader_ready"
+          ? "Writing firmware..."
+          : "Device is not in bootloader mode.",
     });
     try {
       const result = await backendInvoke<FlashResult>("flash_device", {
@@ -172,7 +172,7 @@ function App() {
     }
   };
 
-  const readyToFlash = Boolean(selectedDevice?.supported && selectedAsset && !flashing);
+  const readyToFlash = Boolean(selectedDevice?.can_flash && selectedAsset && !flashing);
 
   return (
     <main className="min-h-screen bg-panel text-ink">
