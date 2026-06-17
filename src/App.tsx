@@ -62,9 +62,110 @@ type FlashResult = {
   mount_path: string;
 };
 
+type Locale = "ja" | "en";
 type FirmwareKind = "left" | "right" | "reset" | "custom";
 
 const deviceScanIntervalMs = 1000;
+const localeStorageKey = "zmk-flasher-locale";
+
+const messages = {
+  en: {
+    bootloaderRequired: "Bootloader mode is required.",
+    custom: "Custom",
+    device: "Device",
+    deviceAndFirmwareRequired: "Device and firmware are required.",
+    deviceScanFailed: "Device scan failed",
+    devices: "Devices",
+    firmware: "Firmware",
+    firmwareNotLoaded: "Firmware is not loaded.",
+    firmwareRefreshFailed: "Firmware refresh failed",
+    firmwareSide: "Firmware",
+    firmwareWritten: "Firmware written",
+    flashFailed: "Flash failed",
+    language: "Language",
+    noFirmwareSelected: "No firmware selected",
+    noMatchingDevice: "No matching device.",
+    noSupportedDevice: "No supported device detected.",
+    none: "none",
+    notLoaded: "not loaded",
+    notReady: "not ready",
+    refreshFirmware: "Refresh firmware",
+    releaseNotLoaded: "Release not loaded",
+    searchDevices: "Search devices",
+    status: "Status",
+    writeFirmware: "Write firmware",
+    writeOptions: "Write options",
+    writeSettings: "Write settings",
+    writingFirmware: "Writing firmware...",
+    found: (count: number) => `${count} found`,
+    wroteFirmware: (assetName: string, deviceLabel: string) =>
+      `Wrote ${assetName} to ${deviceLabel}.`,
+  },
+  ja: {
+    bootloaderRequired: "ブートローダーモードが必要です。",
+    custom: "カスタム",
+    device: "デバイス",
+    deviceAndFirmwareRequired: "デバイスとファームウェアを選択してください。",
+    deviceScanFailed: "デバイスのスキャンに失敗しました",
+    devices: "デバイス",
+    firmware: "ファームウェア",
+    firmwareNotLoaded: "ファームウェアが未読込です。",
+    firmwareRefreshFailed: "ファームウェア更新に失敗しました",
+    firmwareSide: "ファーム",
+    firmwareWritten: "ファームウェアを書き込みました",
+    flashFailed: "書き込みに失敗しました",
+    language: "言語",
+    noFirmwareSelected: "ファームウェア未選択",
+    noMatchingDevice: "一致するデバイスはありません。",
+    noSupportedDevice: "対応デバイスが見つかりません。",
+    none: "なし",
+    notLoaded: "未読込",
+    notReady: "未準備",
+    refreshFirmware: "ファームウェア更新",
+    releaseNotLoaded: "リリース未読込",
+    searchDevices: "デバイスを検索",
+    status: "状態",
+    writeFirmware: "書き込む",
+    writeOptions: "書き込みオプション",
+    writeSettings: "書き込み設定",
+    writingFirmware: "書き込み中...",
+    found: (count: number) => `${count} 件`,
+    wroteFirmware: (assetName: string, deviceLabel: string) =>
+      `${deviceLabel} に ${assetName} を書き込みました。`,
+  },
+} as const;
+
+const firmwareKindLabels: Record<Locale, Record<FirmwareKind, string>> = {
+  en: {
+    left: "Left",
+    right: "Right",
+    reset: "Reset",
+    custom: "Custom",
+  },
+  ja: {
+    left: "左",
+    right: "右",
+    reset: "リセット",
+    custom: "カスタム",
+  },
+};
+
+const deviceStatusLabels: Record<Locale, Record<DeviceStatus, string>> = {
+  en: {
+    bootloader_ready: "ready",
+    app_mode: "app mode",
+    bootloader_required: "bootloader needed",
+    unsupported: "unsupported",
+    unknown: "unknown",
+  },
+  ja: {
+    bootloader_ready: "書き込み可能",
+    app_mode: "通常モード",
+    bootloader_required: "ブートローダーが必要",
+    unsupported: "非対応",
+    unknown: "不明",
+  },
+};
 
 const statusDotTone: Record<DeviceStatus, string> = {
   bootloader_ready: "bg-primary",
@@ -87,12 +188,19 @@ function formatBytes(size: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function formatDate(value?: string) {
-  if (!value) return "unknown";
-  return new Intl.DateTimeFormat("ja-JP", {
+function formatDate(value: string | undefined, locale: Locale) {
+  if (!value) return messages[locale].notLoaded;
+  return new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : "en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function initialLocale(): Locale {
+  if (typeof window === "undefined") return "en";
+  const storedLocale = window.localStorage.getItem(localeStorageKey);
+  if (storedLocale === "ja" || storedLocale === "en") return storedLocale;
+  return window.navigator.language.toLowerCase().startsWith("ja") ? "ja" : "en";
 }
 
 function firmwareKind(name: string): FirmwareKind {
@@ -103,12 +211,9 @@ function firmwareKind(name: string): FirmwareKind {
   return "custom";
 }
 
-function firmwareLabel(asset: FirmwareAsset) {
+function firmwareLabel(asset: FirmwareAsset, locale: Locale) {
   const kind = firmwareKind(asset.name);
-  if (kind === "left") return "Left";
-  if (kind === "right") return "Right";
-  if (kind === "reset") return "Reset";
-  return "Custom";
+  return firmwareKindLabels[locale][kind];
 }
 
 function firmwareOrder(asset: FirmwareAsset) {
@@ -143,6 +248,7 @@ function deviceSearchText(device: DeviceInfo) {
 }
 
 function App() {
+  const [locale, setLocale] = useState<Locale>(initialLocale);
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [release, setRelease] = useState<ReleaseInfo | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
@@ -151,6 +257,7 @@ function App() {
   const [scanning, setScanning] = useState(false);
   const [loadingRelease, setLoadingRelease] = useState(false);
   const [flashing, setFlashing] = useState(false);
+  const t = messages[locale];
 
   const selectedDevice = useMemo(
     () => devices.find((device) => device.id === selectedDeviceId),
@@ -179,11 +286,11 @@ function App() {
         return nextDevices.find((device) => device.can_flash)?.id ?? "";
       });
     } catch (error) {
-      toast.error("Device scan failed", { description: String(error) });
+      toast.error(t.deviceScanFailed, { description: String(error) });
     } finally {
       if (!silent) setScanning(false);
     }
-  }, []);
+  }, [t]);
 
   const refreshRelease = useCallback(async () => {
     setLoadingRelease(true);
@@ -195,11 +302,11 @@ function App() {
         return sortFirmwareAssets(nextRelease.assets)[0]?.id ?? null;
       });
     } catch (error) {
-      toast.error("Firmware refresh failed", { description: String(error) });
+      toast.error(t.firmwareRefreshFailed, { description: String(error) });
     } finally {
       setLoadingRelease(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void refreshDevices();
@@ -215,30 +322,30 @@ function App() {
 
   const flashSelectedDevice = async () => {
     if (!selectedDevice || !selectedAsset) {
-      toast.error("Device and firmware are required.");
+      toast.error(t.deviceAndFirmwareRequired);
       return;
     }
     if (!selectedDevice.can_flash) {
-      toast.warning("Bootloader mode is required.");
+      toast.warning(t.bootloaderRequired);
       return;
     }
 
     setFlashing(true);
-    const toastId = toast.loading("Writing firmware...", {
-      description: `${firmwareLabel(selectedAsset)} to ${selectedDevice.label}`,
+    const toastId = toast.loading(t.writingFirmware, {
+      description: `${firmwareLabel(selectedAsset, locale)} / ${selectedDevice.label}`,
     });
     try {
       const result = await backendInvoke<FlashResult>("flash_device", {
         deviceId: selectedDevice.id,
         assetId: selectedAsset.id,
       });
-      toast.success("Firmware written", {
+      toast.success(t.firmwareWritten, {
         id: toastId,
-        description: `Wrote ${result.asset_name} to ${result.device_label}.`,
+        description: t.wroteFirmware(result.asset_name, result.device_label),
       });
       await refreshDevices(true);
     } catch (error) {
-      toast.error("Flash failed", { id: toastId, description: String(error) });
+      toast.error(t.flashFailed, { id: toastId, description: String(error) });
     } finally {
       setFlashing(false);
     }
@@ -246,19 +353,40 @@ function App() {
 
   const readyToFlash = Boolean(selectedDevice?.can_flash && selectedAsset && !flashing);
 
+  useEffect(() => {
+    window.localStorage.setItem(localeStorageKey, locale);
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   return (
     <main className="h-dvh overflow-hidden bg-background text-foreground">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="grid min-h-0 flex-1 md:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)] lg:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="flex min-h-0 min-w-0 flex-col border-r bg-muted/25 px-5 py-5" aria-labelledby="devices-title">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h2 id="devices-title" className="truncate text-base font-semibold">
-                  Devices
+                  {t.devices}
                 </h2>
-                <p className="mt-0.5 text-sm text-muted-foreground">{devices.length} found</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{t.found(devices.length)}</p>
               </div>
-              {scanning && <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />}
+              <div className="flex shrink-0 items-center gap-2">
+                {scanning && <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />}
+                <div className="flex rounded-md border bg-background p-0.5" aria-label={t.language}>
+                  {(["ja", "en"] as const).map((nextLocale) => (
+                    <Button
+                      className="h-7 px-2 text-xs shadow-none"
+                      key={nextLocale}
+                      onClick={() => setLocale(nextLocale)}
+                      size="xs"
+                      type="button"
+                      variant={locale === nextLocale ? "secondary" : "ghost"}
+                    >
+                      {nextLocale === "ja" ? "JA" : "EN"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <label className="mt-4 flex h-10 items-center gap-2 rounded-md border bg-background px-3 text-muted-foreground shadow-sm focus-within:ring-2 focus-within:ring-ring">
@@ -266,7 +394,7 @@ function App() {
               <input
                 className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
                 onChange={(event) => setDeviceSearch(event.target.value)}
-                placeholder="Search devices"
+                placeholder={t.searchDevices}
                 value={deviceSearch}
               />
             </label>
@@ -277,13 +405,13 @@ function App() {
                   <div className="space-y-3 text-muted-foreground">
                     <Usb className="mx-auto size-7" />
                     <AlertDescription className="font-medium">
-                      No supported device detected.
+                      {t.noSupportedDevice}
                     </AlertDescription>
                   </div>
                 </Alert>
               ) : visibleDevices.length === 0 ? (
                 <Alert className="grid min-h-32 place-items-center border-dashed bg-background/65 text-center">
-                  <AlertDescription className="font-medium">No matching device.</AlertDescription>
+                  <AlertDescription className="font-medium">{t.noMatchingDevice}</AlertDescription>
                 </Alert>
               ) : (
                 <div className="space-y-2">
@@ -342,12 +470,12 @@ function App() {
 
           </aside>
 
-          <section className="min-h-0 min-w-0 bg-background px-8 py-6">
+          <section className="min-h-0 min-w-0 bg-background px-6 py-6 lg:px-8">
             <div className="mx-auto flex h-full min-h-0 max-w-4xl flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <h2 className="truncate text-xl font-semibold">Write settings</h2>
+                    <h2 className="truncate text-xl font-semibold">{t.writeSettings}</h2>
                   </div>
                   <Button
                     className="gap-2"
@@ -356,14 +484,14 @@ function App() {
                     variant="outline"
                   >
                     {loadingRelease ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-                    <span>Refresh firmware</span>
+                    <span>{t.refreshFirmware}</span>
                   </Button>
                 </div>
 
                 <div className="mt-6 pb-4">
                   <section className="space-y-3" aria-labelledby="firmware-title">
                     <h3 id="firmware-title" className="text-base font-semibold">
-                      Firmware
+                      {t.firmware}
                     </h3>
 
                     <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
@@ -371,19 +499,21 @@ function App() {
                         <FileText className="size-6 shrink-0 text-muted-foreground" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-medium">
-                            {selectedAsset ? firmwareLabel(selectedAsset) : "No firmware selected"}
+                            {selectedAsset ? firmwareLabel(selectedAsset, locale) : t.noFirmwareSelected}
                           </p>
                           <p className="mt-1 truncate text-sm text-muted-foreground">
-                            {selectedAsset?.name ?? "not loaded"}
+                            {selectedAsset?.name ?? t.notLoaded}
                           </p>
                         </div>
                         <Badge className="shrink-0" variant="outline">
-                          {selectedAsset ? formatBytes(selectedAsset.size) : "none"}
+                          {selectedAsset ? formatBytes(selectedAsset.size) : t.none}
                         </Badge>
                       </div>
                       <Separator />
                       <p className="truncate px-4 py-2 text-sm text-muted-foreground">
-                        {release ? `${release.tag_name} · ${formatDate(release.published_at)}` : "Release not loaded"}
+                        {release
+                          ? `${release.tag_name} · ${formatDate(release.published_at, locale)}`
+                          : t.releaseNotLoaded}
                       </p>
                     </div>
 
@@ -412,7 +542,7 @@ function App() {
                                     )}
                                     variant="secondary"
                                   >
-                                    {firmwareLabel(asset)}
+                                    {firmwareLabel(asset, locale)}
                                   </Badge>
                                   <span className="min-w-0 flex-1">
                                     <span className="block truncate font-medium">{asset.name}</span>
@@ -431,7 +561,7 @@ function App() {
                     ) : (
                       <Alert className="min-h-32 items-center bg-muted/25">
                         <RefreshCw className="size-4" />
-                        <AlertDescription>Firmware is not loaded.</AlertDescription>
+                        <AlertDescription>{t.firmwareNotLoaded}</AlertDescription>
                       </Alert>
                     )}
                   </section>
@@ -440,12 +570,18 @@ function App() {
 
               <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_168px] gap-3 border-t bg-background pt-3">
                 <section
-                  aria-label="Write options"
+                  aria-label={t.writeOptions}
                   className="grid min-w-0 grid-cols-3 divide-x overflow-hidden rounded-md border bg-muted/20"
                 >
-                  <OptionTile label="Device" value={selectedDevice?.label ?? "none"} />
-                  <OptionTile label="Status" value={selectedDevice?.status_label ?? "not ready"} />
-                  <OptionTile label="Firmware" value={selectedAsset ? firmwareLabel(selectedAsset) : "none"} />
+                  <OptionTile label={t.device} value={selectedDevice?.label ?? t.none} />
+                  <OptionTile
+                    label={t.status}
+                    value={selectedDevice ? deviceStatusLabels[locale][selectedDevice.status] : t.notReady}
+                  />
+                  <OptionTile
+                    label={t.firmwareSide}
+                    value={selectedAsset ? firmwareLabel(selectedAsset, locale) : t.none}
+                  />
                 </section>
                 <Button
                   className="h-full min-h-11 gap-2 rounded-md text-sm shadow-sm"
@@ -453,7 +589,7 @@ function App() {
                   onClick={() => void flashSelectedDevice()}
                 >
                   {flashing ? <Loader2 className="animate-spin" /> : <Play className="fill-current" />}
-                  <span>Write firmware</span>
+                  <span>{t.writeFirmware}</span>
                 </Button>
               </div>
             </div>
