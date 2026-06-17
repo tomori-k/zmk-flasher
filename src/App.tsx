@@ -1,17 +1,22 @@
 import {
-  AlertCircle,
   CheckCircle2,
   Cpu,
-  Download,
+  FileText,
   HardDrive,
-  Info,
   Loader2,
+  Play,
   RefreshCw,
+  Search,
   Usb,
-  X,
-  Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { backendInvoke } from "./backend";
 
 type DeviceStatus = "bootloader_ready" | "app_mode" | "bootloader_required" | "unsupported" | "unknown";
@@ -57,23 +62,23 @@ type FlashResult = {
   mount_path: string;
 };
 
-type AppMessage = {
-  id: number;
-  tone: "info" | "success" | "error";
-  text: string;
-  persistent?: boolean;
-};
-
 type FirmwareKind = "left" | "right" | "reset" | "custom";
 
 const deviceScanIntervalMs = 1000;
 
-const statusTone: Record<DeviceStatus, string> = {
-  bootloader_ready: "border-mint/30 bg-mint/10 text-mint",
-  app_mode: "border-brass/30 bg-brass/10 text-brass",
-  bootloader_required: "border-brass/30 bg-brass/10 text-brass",
-  unsupported: "border-coral/30 bg-coral/10 text-coral",
-  unknown: "border-line bg-white text-ink/70",
+const statusDotTone: Record<DeviceStatus, string> = {
+  bootloader_ready: "bg-primary",
+  app_mode: "bg-amber-400",
+  bootloader_required: "bg-amber-400",
+  unsupported: "bg-destructive",
+  unknown: "bg-muted-foreground/35",
+};
+
+const firmwareTone: Record<FirmwareKind, string> = {
+  left: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  right: "border-sky-200 bg-sky-50 text-sky-700",
+  reset: "border-rose-200 bg-rose-50 text-rose-700",
+  custom: "border-border bg-muted text-muted-foreground",
 };
 
 function formatBytes(size: number) {
@@ -123,16 +128,29 @@ function sortFirmwareAssets(assets: FirmwareAsset[]) {
   );
 }
 
+function deviceSearchText(device: DeviceInfo) {
+  return [
+    device.label,
+    device.model,
+    device.detail,
+    device.mount_path,
+    device.port_name,
+    device.serial_number,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 function App() {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [release, setRelease] = useState<ReleaseInfo | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [deviceSearch, setDeviceSearch] = useState("");
   const [scanning, setScanning] = useState(false);
   const [loadingRelease, setLoadingRelease] = useState(false);
   const [flashing, setFlashing] = useState(false);
-  const [message, setMessage] = useState<AppMessage | null>(null);
-  const messageIdRef = useRef(0);
 
   const selectedDevice = useMemo(
     () => devices.find((device) => device.id === selectedDeviceId),
@@ -143,19 +161,11 @@ function App() {
     [release, selectedAssetId],
   );
   const firmwareAssets = useMemo(() => (release ? sortFirmwareAssets(release.assets) : []), [release]);
-
-  const showMessage = useCallback((nextMessage: Omit<AppMessage, "id">) => {
-    messageIdRef.current += 1;
-    setMessage({ id: messageIdRef.current, ...nextMessage });
-  }, []);
-
-  useEffect(() => {
-    if (!message || message.persistent) return;
-    const timer = window.setTimeout(() => {
-      setMessage((current) => (current?.id === message.id ? null : current));
-    }, 4200);
-    return () => window.clearTimeout(timer);
-  }, [message]);
+  const visibleDevices = useMemo(() => {
+    const query = deviceSearch.trim().toLowerCase();
+    if (!query) return devices;
+    return devices.filter((device) => deviceSearchText(device).includes(query));
+  }, [deviceSearch, devices]);
 
   const refreshDevices = useCallback(async (silent = false) => {
     if (!silent) setScanning(true);
@@ -163,15 +173,17 @@ function App() {
       const nextDevices = await backendInvoke<DeviceInfo[]>("scan_devices");
       setDevices(nextDevices);
       setSelectedDeviceId((current) => {
-        if (current && nextDevices.some((device) => device.id === current)) return current;
-        return nextDevices.find((device) => device.supported)?.id ?? nextDevices[0]?.id ?? "";
+        if (current && nextDevices.some((device) => device.id === current && device.can_flash)) {
+          return current;
+        }
+        return nextDevices.find((device) => device.can_flash)?.id ?? "";
       });
     } catch (error) {
-      showMessage({ tone: "error", text: `Device scan failed: ${String(error)}` });
+      toast.error("Device scan failed", { description: String(error) });
     } finally {
       if (!silent) setScanning(false);
     }
-  }, [showMessage]);
+  }, []);
 
   const refreshRelease = useCallback(async () => {
     setLoadingRelease(true);
@@ -183,11 +195,11 @@ function App() {
         return sortFirmwareAssets(nextRelease.assets)[0]?.id ?? null;
       });
     } catch (error) {
-      showMessage({ tone: "error", text: `Firmware refresh failed: ${String(error)}` });
+      toast.error("Firmware refresh failed", { description: String(error) });
     } finally {
       setLoadingRelease(false);
     }
-  }, [showMessage]);
+  }, []);
 
   useEffect(() => {
     void refreshDevices();
@@ -203,30 +215,30 @@ function App() {
 
   const flashSelectedDevice = async () => {
     if (!selectedDevice || !selectedAsset) {
-      showMessage({ tone: "error", text: "Device and firmware are required." });
+      toast.error("Device and firmware are required.");
       return;
     }
+    if (!selectedDevice.can_flash) {
+      toast.warning("Bootloader mode is required.");
+      return;
+    }
+
     setFlashing(true);
-    showMessage({
-      tone: "info",
-      text:
-        selectedDevice.status === "bootloader_ready"
-          ? "Writing firmware..."
-          : "Device is not in bootloader mode.",
-      persistent: true,
+    const toastId = toast.loading("Writing firmware...", {
+      description: `${firmwareLabel(selectedAsset)} to ${selectedDevice.label}`,
     });
     try {
       const result = await backendInvoke<FlashResult>("flash_device", {
         deviceId: selectedDevice.id,
         assetId: selectedAsset.id,
       });
-      showMessage({
-        tone: "success",
-        text: `Wrote ${result.asset_name} to ${result.device_label}.`,
+      toast.success("Firmware written", {
+        id: toastId,
+        description: `Wrote ${result.asset_name} to ${result.device_label}.`,
       });
       await refreshDevices(true);
     } catch (error) {
-      showMessage({ tone: "error", text: `Flash failed: ${String(error)}` });
+      toast.error("Flash failed", { id: toastId, description: String(error) });
     } finally {
       setFlashing(false);
     }
@@ -235,174 +247,230 @@ function App() {
   const readyToFlash = Boolean(selectedDevice?.can_flash && selectedAsset && !flashing);
 
   return (
-    <main className="min-h-dvh overflow-x-hidden bg-panel text-ink">
-      <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-5 px-4 pb-56 pt-4 sm:px-5 sm:pb-36 lg:pb-28">
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
-          <div className="space-y-4">
-            <div className="section-heading">
-              <div>
-                <h2>Devices</h2>
-                <p>{devices.length} found</p>
+    <main className="h-dvh overflow-hidden bg-background text-foreground">
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="grid min-h-0 flex-1 md:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="flex min-h-0 min-w-0 flex-col border-r bg-muted/25 px-5 py-5" aria-labelledby="devices-title">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 id="devices-title" className="truncate text-base font-semibold">
+                  Devices
+                </h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">{devices.length} found</p>
               </div>
-              <button
-                className="icon-button"
-                onClick={() => void refreshDevices()}
-                disabled={scanning}
-                title="Scan devices"
-                type="button"
-              >
-                {scanning ? <Loader2 className="animate-spin" size={20} /> : <RefreshCw size={20} />}
-              </button>
+              {scanning && <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />}
             </div>
 
-            {devices.length === 0 ? (
-              <div className="empty-state">
-                <Usb size={28} />
-                <p>No supported device detected.</p>
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                {devices.map((device) => (
-                  <button
-                    key={device.id}
-                    aria-pressed={selectedDeviceId === device.id}
-                    className={`device-row ${selectedDeviceId === device.id ? "choice-row-selected" : ""}`}
-                    onClick={() => setSelectedDeviceId(device.id)}
-                    type="button"
-                  >
-                    <span className="choice-icon">
-                      {device.kind === "bootloader" ? (
-                        <HardDrive size={22} />
-                      ) : device.kind === "usb" ? (
-                        <Usb size={22} />
-                      ) : (
-                        <Cpu size={22} />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1 text-left">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="block truncate text-base font-semibold">{device.label}</span>
-                        {selectedDeviceId === device.id && (
-                          <CheckCircle2 className="shrink-0 text-mint" size={18} />
-                        )}
-                      </span>
-                      <span className="mt-1 block truncate text-sm text-ink/60">
-                        {device.detail ?? device.model}
-                      </span>
-                    </span>
-                    <span className={`status-pill ${statusTone[device.status]}`}>{device.status_label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+            <label className="mt-4 flex h-10 items-center gap-2 rounded-md border bg-background px-3 text-muted-foreground shadow-sm focus-within:ring-2 focus-within:ring-ring">
+              <Search className="size-4 shrink-0" />
+              <input
+                className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                onChange={(event) => setDeviceSearch(event.target.value)}
+                placeholder="Search devices"
+                value={deviceSearch}
+              />
+            </label>
 
-          <aside className="space-y-4">
-            <section className="space-y-4">
-              <div className="section-heading">
-                <div>
-                  <h2>Firmware</h2>
-                  <p>{release ? `${release.tag_name} · ${formatDate(release.published_at)}` : "not loaded"}</p>
-                </div>
-                <button
-                  className="icon-button"
-                  onClick={() => void refreshRelease()}
-                  disabled={loadingRelease}
-                  title="Refresh firmware"
-                  type="button"
-                >
-                  {loadingRelease ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
-                </button>
-              </div>
-              {release ? (
-                <div className="grid gap-3">
-                  {firmwareAssets.map((asset) => {
-                    const kind = firmwareKind(asset.name);
-                    const selected = selectedAssetId === asset.id;
+            <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+              {devices.length === 0 ? (
+                <Alert className="grid min-h-44 place-items-center border-dashed bg-background/65 text-center">
+                  <div className="space-y-3 text-muted-foreground">
+                    <Usb className="mx-auto size-7" />
+                    <AlertDescription className="font-medium">
+                      No supported device detected.
+                    </AlertDescription>
+                  </div>
+                </Alert>
+              ) : visibleDevices.length === 0 ? (
+                <Alert className="grid min-h-32 place-items-center border-dashed bg-background/65 text-center">
+                  <AlertDescription className="font-medium">No matching device.</AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-2">
+                  {visibleDevices.map((device) => {
+                    const selected = selectedDeviceId === device.id && device.can_flash;
                     return (
                       <button
-                        key={asset.id}
+                        key={device.id}
+                        aria-disabled={!device.can_flash}
                         aria-pressed={selected}
-                        className={`firmware-option ${selected ? "choice-row-selected" : ""}`}
-                        onClick={() => setSelectedAssetId(asset.id)}
-                        title={asset.name}
+                        className={cn(
+                          "relative flex min-h-20 w-full min-w-0 items-center gap-3 overflow-hidden rounded-lg px-4 py-3 text-left transition-colors",
+                          device.can_flash ? "hover:bg-background/80" : "cursor-not-allowed opacity-65",
+                          selected ? "bg-emerald-50 shadow-sm ring-1 ring-primary/10" : "bg-transparent",
+                        )}
+                        disabled={!device.can_flash}
+                        onClick={() => setSelectedDeviceId(device.id)}
                         type="button"
                       >
-                        <span className={`firmware-badge firmware-badge-${kind}`}>{firmwareLabel(asset)}</span>
-                        <span className="min-w-0 flex-1 text-left">
-                          <span className="block truncate text-sm font-semibold">{asset.name}</span>
-                          <span className="mt-1 block text-xs text-ink/55">{formatBytes(asset.size)}</span>
+                        {selected && <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-primary" />}
+                        <span
+                          className={cn(
+                            "grid size-10 shrink-0 place-items-center rounded-md border bg-background text-muted-foreground transition-colors",
+                            selected && "border-primary/40 bg-primary/10 text-primary",
+                          )}
+                        >
+                          {device.kind === "bootloader" ? (
+                            <HardDrive className="size-5" />
+                          ) : device.kind === "usb" ? (
+                            <Usb className="size-5" />
+                          ) : (
+                            <Cpu className="size-5" />
+                          )}
                         </span>
-                        {selected && <CheckCircle2 className="shrink-0 text-mint" size={18} />}
+                        <span className="min-w-0 flex-1">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate font-medium">{device.label}</span>
+                            {selected && <CheckCircle2 className="size-4 shrink-0 text-primary" />}
+                          </span>
+                          <span className="mt-1 block truncate text-sm text-muted-foreground">
+                            {device.detail ?? device.model}
+                          </span>
+                        </span>
+                        <span
+                          className={cn(
+                            "size-2.5 shrink-0 rounded-full",
+                            statusDotTone[device.status],
+                          )}
+                        />
                       </button>
                     );
                   })}
                 </div>
-              ) : (
-                <div className="empty-state mt-4 min-h-32">
-                  <Download size={24} />
-                  <p>Firmware is not loaded.</p>
-                </div>
               )}
-            </section>
+            </div>
+
           </aside>
-        </section>
 
-        {message && (
-          <div className={messageClassName(message.tone)} role={message.tone === "error" ? "alert" : "status"}>
-            {message.tone === "success" ? (
-              <CheckCircle2 size={18} />
-            ) : message.tone === "error" ? (
-              <AlertCircle size={18} />
-            ) : (
-              <Info size={18} />
-            )}
-            <span>{message.text}</span>
-            <button className="toast-close" onClick={() => setMessage(null)} title="Dismiss" type="button">
-              <X size={16} />
-            </button>
-          </div>
-        )}
-      </div>
+          <section className="min-h-0 min-w-0 bg-background px-8 py-6">
+            <div className="mx-auto flex h-full min-h-0 max-w-4xl flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-xl font-semibold">Write settings</h2>
+                  </div>
+                  <Button
+                    className="gap-2"
+                    disabled={loadingRelease}
+                    onClick={() => void refreshRelease()}
+                    variant="outline"
+                  >
+                    {loadingRelease ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                    <span>Refresh firmware</span>
+                  </Button>
+                </div>
 
-      <section className="write-bar" aria-label="Write firmware">
-        <div className="write-bar-inner">
-          <div className="write-summary">
-            <div className="write-summary-item">
-              <span>Device</span>
-              <strong>{selectedDevice?.label ?? "none"}</strong>
+                <div className="mt-6 pb-4">
+                  <section className="space-y-3" aria-labelledby="firmware-title">
+                    <h3 id="firmware-title" className="text-base font-semibold">
+                      Firmware
+                    </h3>
+
+                    <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
+                      <div className="flex min-h-14 items-center gap-4 px-4 py-3">
+                        <FileText className="size-6 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">
+                            {selectedAsset ? firmwareLabel(selectedAsset) : "No firmware selected"}
+                          </p>
+                          <p className="mt-1 truncate text-sm text-muted-foreground">
+                            {selectedAsset?.name ?? "not loaded"}
+                          </p>
+                        </div>
+                        <Badge className="shrink-0" variant="outline">
+                          {selectedAsset ? formatBytes(selectedAsset.size) : "none"}
+                        </Badge>
+                      </div>
+                      <Separator />
+                      <p className="truncate px-4 py-2 text-sm text-muted-foreground">
+                        {release ? `${release.tag_name} · ${formatDate(release.published_at)}` : "Release not loaded"}
+                      </p>
+                    </div>
+
+                    {release ? (
+                      <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
+                        {firmwareAssets.map((asset) => {
+                          const kind = firmwareKind(asset.name);
+                          const selected = selectedAssetId === asset.id;
+                          return (
+                            <Tooltip key={asset.id}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  aria-pressed={selected}
+                                  className={cn(
+                                    "relative flex min-h-14 w-full min-w-0 items-center gap-3 overflow-hidden border-b px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-muted/45",
+                                    selected && "bg-primary/[0.06]",
+                                  )}
+                                  onClick={() => setSelectedAssetId(asset.id)}
+                                  type="button"
+                                >
+                                  {selected && <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-primary" />}
+                                  <Badge
+                                    className={cn(
+                                      "grid h-9 min-w-16 shrink-0 place-items-center rounded-md border px-3 text-sm",
+                                      firmwareTone[kind],
+                                    )}
+                                    variant="secondary"
+                                  >
+                                    {firmwareLabel(asset)}
+                                  </Badge>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate font-medium">{asset.name}</span>
+                                    <span className="mt-1 block text-sm text-muted-foreground">
+                                      {formatBytes(asset.size)}
+                                    </span>
+                                  </span>
+                                  {selected && <CheckCircle2 className="size-4 shrink-0 text-primary" />}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>{asset.name}</TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <Alert className="min-h-32 items-center bg-muted/25">
+                        <RefreshCw className="size-4" />
+                        <AlertDescription>Firmware is not loaded.</AlertDescription>
+                      </Alert>
+                    )}
+                  </section>
+                </div>
+              </div>
+
+              <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_168px] gap-3 border-t bg-background pt-3">
+                <section
+                  aria-label="Write options"
+                  className="grid min-w-0 grid-cols-3 divide-x overflow-hidden rounded-md border bg-muted/20"
+                >
+                  <OptionTile label="Device" value={selectedDevice?.label ?? "none"} />
+                  <OptionTile label="Status" value={selectedDevice?.status_label ?? "not ready"} />
+                  <OptionTile label="Firmware" value={selectedAsset ? firmwareLabel(selectedAsset) : "none"} />
+                </section>
+                <Button
+                  className="h-full min-h-11 gap-2 rounded-md text-sm shadow-sm"
+                  disabled={!readyToFlash}
+                  onClick={() => void flashSelectedDevice()}
+                >
+                  {flashing ? <Loader2 className="animate-spin" /> : <Play className="fill-current" />}
+                  <span>Write firmware</span>
+                </Button>
+              </div>
             </div>
-            <div className="write-summary-item">
-              <span>Status</span>
-              <strong>{selectedDevice?.status_label ?? "not ready"}</strong>
-            </div>
-            <div className="write-summary-item">
-              <span>Firmware</span>
-              <strong>{selectedAsset ? firmwareLabel(selectedAsset) : "none"}</strong>
-            </div>
-          </div>
-          {selectedDevice?.supported && !selectedDevice.can_flash && (
-            <p className="write-note">Bootloader mode is required.</p>
-          )}
-          <button
-            className="primary-button"
-            disabled={!readyToFlash}
-            onClick={() => void flashSelectedDevice()}
-            type="button"
-          >
-            {flashing ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
-            <span>Write firmware</span>
-          </button>
+          </section>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
 
 export default App;
 
-function messageClassName(tone: AppMessage["tone"]) {
-  if (tone === "success") return "message-bar message-success";
-  if (tone === "error") return "message-bar message-error";
-  return "message-bar message-info";
+function OptionTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 px-3 py-2">
+      <span className="block truncate text-xs font-medium text-muted-foreground">{label}</span>
+      <strong className="mt-1 block truncate text-sm font-medium">{value}</strong>
+    </div>
+  );
 }
